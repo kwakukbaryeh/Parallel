@@ -29,25 +29,25 @@ static inline int nextPow2(int n)
     return n;
 }
 
-__global__ void upsweep_kernel(int* data, int N, int twod) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = twod * 2;
-
-    if (index < N / stride) {
-        int offset = index * stride + twod - 1;
-        data[offset + twod] += data[offset];
+// Upsweep Kernel
+__global__ void upsweep(int* data, int N, int twod, int twod1) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < N/twod1) {
+        int j = i * twod1 + twod - 1;
+       data[j + twod] += data[j];
     }
 }
 
-__global__ void downsweep_kernel(int* data, int N, int twod) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = twod * 2;
-
-    if (index < N / stride) {
-        int offset = index * stride + twod - 1;
-        int t = data[offset];
-        data[offset] = data[offset + twod];
-        data[offset + twod] += t;
+// Downsweep Kernel
+__global__ void downsweep(int* data, int N, int twod, int twod1) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < N/twod1) {
+        int j = i * twod1 + twod - 1;
+        int t = data[j];
+        data[j] = data[j + twod];
+        // change twod1 below to twod to reverse prefix sum.
+        data[j + twod] += t;
     }
 }
 
@@ -65,22 +65,32 @@ void exclusive_scan(int* device_data, int length)
      * both the data array is sized to accommodate the next
      * power of 2 larger than the input.
      */
+
     int N = nextPow2(length);
 
-    // Upsweep Phase
-    for (int twod = 1; twod < N; twod *= 2) {
-        int blocks = (N / (2 * twod) + 255) / 256;
-        upsweep_kernel<<<blocks, 256>>>(device_data, N, twod);
+    // Cuda Parameters
+    const int threadsPerBlock = 256;
+    const int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
+    
+
+    // upsweep phase.
+    for (int twod = 1; twod < N; twod*=2) {
+        int twod1 = twod*2;
+
+        // parallel_for (int i = 0; i < N; i += twod1)
+        //     data[i+twod1-1] += data[i+twod-1];
+        upsweep<<<blocks, threadsPerBlock>>>(device_data, N, twod, twod1);
         cudaDeviceSynchronize();
     }
 
-    // Set root to 0 for exclusive scan
-    cudaMemset(&device_data[N - 1], 0, sizeof(int));
+    // data[N-1] = 0;
+    cudaMemset(&device_data[N-1], 0, sizeof(int));
 
-    // Downsweep Phase
-    for (int twod = N / 2; twod >= 1; twod /= 2) {
-        int blocks = (N / (2 * twod) + 255) / 256;
-        downsweep_kernel<<<blocks, 256>>>(device_data, N, twod);
+    // downsweep phase.
+    for (int twod = N/2; twod >= 1; twod /= 2) {
+        int twod1 = twod*2;
+        
+        downsweep<<<blocks, threadsPerBlock>>>(device_data, N, twod, twod1);
         cudaDeviceSynchronize();
     }
 }
@@ -148,36 +158,34 @@ double cudaScanThrust(int* inarray, int* end, int* resultarray) {
     return overallDuration;
 }
 
-__global__ void mark_peaks_kernel(int* input, int* markers, int length) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // Correct boundary check
-    if (index > 0 && index < length - 1) {
-        if (input[index] > input[index - 1] && input[index] > input[index + 1]) {
-            markers[index] = 1;
-        } else {
-            markers[index] = 0;
-        }
+__global__ void isPeak(int *data, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i > 0 && i < N && data[i] > data[i-1] && data[i] > data[i+1])
+        data[i] = 1;
+    else
+        data[i] = 0;
+}
+
+__global__ void getInd(int *data, int N, int *output) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < N && data[i] == 1) {
+        output[i] = i;
     }
 
-    // Clear out-of-bounds elements if padded to next power of 2
-    if (index >= length) {
-        markers[index] = 0;
+}
+
+__global__ void findIdx(int *data, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < N && data[i] == 0) {
+        data[i] = data[i+1];
     }
 }
 
-__global__ void gather_peaks_kernel(int* markers, int* output, int length) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (index < length && markers[index] < markers[index + 1]) {
-        int output_index = markers[index];
-        if (output_index < length) {
-            output[output_index] = index;  // Safeguard against overflows
-        }
-}
-    
-    if (index >= length) {
-        return;
+__global__ void dedup(int *data, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < N && data[i] == data[i+1]) {
+        data[i+1] = 0;
     }
 }
 
@@ -196,38 +204,34 @@ int find_peaks(int *device_input, int length, int *device_output) {
      * it requires that. However, you must ensure that the results of
      * find_peaks are correct given the original length.
      */
-    int rounded_length = nextPow2(length);
-    int *markers;
 
-    // Allocate memory with rounded size
-    cudaMalloc(&markers, sizeof(int) * rounded_length);
 
-    // Mark peaks
-    int blocks = (length + 255) / 256;
-    mark_peaks_kernel<<<blocks, 256>>>(device_input, markers, length);
+    int N = nextPow2(length);
+
+    // Cuda Parameters
+    const int threadsPerBlock = 256;
+    const int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
+
+    isPeak<<<threadsPerBlock, blocks>>>(device_input, N);
     cudaDeviceSynchronize();
 
-    // Clear padded elements in markers to 0
-    int zero_size = rounded_length - length;
-    if (zero_size > 0) {
-        cudaMemset(markers + length, 0, zero_size * sizeof(int));
+    getInd<<<threadsPerBlock, blocks>>>(device_input, N, device_output);
+    cudaDeviceSynchronize();
+
+    for (int i = 0; i < N; i++) {
+        findIdx<<<threadsPerBlock, blocks>>>(device_output, N);
+        cudaDeviceSynchronize();
+        dedup<<<threadsPerBlock, blocks>>>(device_output, N);
+        cudaDeviceSynchronize();
     }
 
-    // Perform exclusive scan on the rounded markers array
-    exclusive_scan(markers, rounded_length);
+    exclusive_scan(device_input, N);
 
-    // Gather peaks using original length
-    gather_peaks_kernel<<<blocks, 256>>>(markers, device_output, length);
-    cudaDeviceSynchronize();
+    int ret = 0;
+    cudaMemcpy(&ret, &device_input[N-1], sizeof(int), cudaMemcpyDeviceToHost);
+    fprintf(stderr, "RET: %d\n", ret);
+    return ret;
 
-    // Get the total number of peaks from the end of the scan_result
-    int num_peaks;
-    cudaMemcpy(&num_peaks, &markers[rounded_length - 1], sizeof(int), cudaMemcpyDeviceToHost);
-
-    // Free memory
-    cudaFree(markers);
-
-    return num_peaks;
 }
 
 

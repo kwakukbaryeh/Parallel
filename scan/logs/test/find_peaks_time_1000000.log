@@ -5,5 +5,5 @@ Device 0: NVIDIA GeForce RTX 2080
    Global mem: 7959 MB
    CUDA Cap:   7.5
 ---------------------------------------------------------
-GPU_time: 0.538 ms
+GPU_time: 0.534 ms
 Find_peaks outputs are correct!

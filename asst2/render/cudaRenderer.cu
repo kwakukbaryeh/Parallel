@@ -11,6 +11,7 @@
 #include <cuda_runtime.h>
 #include <driver_functions.h>
 
+
 #include "cudaRenderer.h"
 #include "image.h"
 #include "noise.h"
@@ -380,7 +381,12 @@ shadePixel(float2 pixelCenter, float3 p, float4* imagePtr, int circleIndex) {
     newColor.w = alpha + existingColor.w;
 
     // Global memory write
-    *imagePtr = newColor;
+    // Do this atomically: 
+    // *imagePtr = newColor;
+    atomicExch(&imagePtr->x, newColor.x);
+    atomicExch(&imagePtr->y, newColor.y);
+    atomicExch(&imagePtr->z, newColor.z);
+    atomicExch(&imagePtr->w, newColor.w);
 
     // END SHOULD-BE-ATOMIC REGION
 }
@@ -412,8 +418,7 @@ __global__ void kernelRenderCircles() {
     short minY = static_cast<short>(imageHeight * (p.y - rad));
     short maxY = static_cast<short>(imageHeight * (p.y + rad)) + 1;
 
-    // A bunch of clamps.  Is there a CUDA built-in for this? 
-    // kwaku do this.
+    // A bunch of clamps.  Is there a CUDA built-in for this?
     short screenMinX = (minX > 0) ? ((minX < imageWidth) ? minX : imageWidth) : 0;
     short screenMaxX = (maxX > 0) ? ((maxX < imageWidth) ? maxX : imageWidth) : 0;
     short screenMinY = (minY > 0) ? ((minY < imageHeight) ? minY : imageHeight) : 0;
@@ -430,6 +435,65 @@ __global__ void kernelRenderCircles() {
                                                  invHeight * (static_cast<float>(pixelY) + 0.5f));
             shadePixel(pixelCenterNorm, p, imgPtr, index);
             imgPtr++;
+        }
+    }
+}
+
+/**
+ * Render Pixel
+ * 
+ * Renders a pixel by checking all circles and determining which ones affect it, going in order of depth.
+ */
+__global__ void renderPixel() {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Find this pixel's center
+    int y = index / cuConstRendererParams.imageWidth;
+    int x = index % cuConstRendererParams.imageWidth;
+    float2 center = make_float2((static_cast<float>(x) + 0.5f)/cuConstRendererParams.imageWidth, (static_cast<float>(y) + 0.5f)/cuConstRendererParams.imageHeight);
+
+    // Check against all the circles
+    for (int i = 0; i < cuConstRendererParams.numberOfCircles; i++) {
+        float3 pos = *(float3 *)&(cuConstRendererParams.position[3 * i]);
+        float r = cuConstRendererParams.radius[i];
+
+        // Check if the circle affects the pixel
+        float diffX = pos.x - center.x;
+        float diffY = pos.y - center.y;
+        float dist = diffX * diffX + diffY * diffY;
+        if (dist < r * r) {
+            // Figure out RGB/Alpha
+            float3 rgb;
+            float alpha;
+            
+            if (cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME) {
+                const float kCircleMaxAlpha = .5f;
+                const float falloffScale = 4.f;
+
+                float normPixelDist = sqrt(dist) / r;
+                rgb = lookupColor(normPixelDist);
+
+                float maxAlpha = .6f + .4f * (1.f - pos.z);
+                maxAlpha = kCircleMaxAlpha * fmaxf(fminf(maxAlpha, 1.f), 0.f); // kCircleMaxAlpha * clamped value
+                alpha = maxAlpha * exp(-1.f * falloffScale * normPixelDist * normPixelDist);
+
+            } else {
+                // Simple: each circle has an assigned color
+                rgb = *(float3 *)&(cuConstRendererParams.color[3 * i]);
+                alpha = .5f;
+            }
+
+            // Calculate color (Atomics Not needed since this is the only thread updating this pixel)
+            float oneMinusAlpha = 1.f - alpha;
+
+            float4 *ptr = (float4 *)&cuConstRendererParams.imageData[index * 4];
+            float4 existingColor = *ptr;
+            float4 newColor;
+            newColor.x = alpha * rgb.x + oneMinusAlpha * existingColor.x;
+            newColor.y = alpha * rgb.y + oneMinusAlpha * existingColor.y;
+            newColor.z = alpha * rgb.z + oneMinusAlpha * existingColor.z;
+            newColor.w = alpha + existingColor.w;
+            *ptr = newColor;
         }
     }
 }
@@ -475,8 +539,7 @@ CudaRenderer::~CudaRenderer() {
     }
 }
 
-const Image*
-CudaRenderer::getImage() {
+const Image* CudaRenderer::getImage() {
 
     // Need to copy contents of the rendered image from device memory
     // before we expose the Image object to the caller
@@ -491,14 +554,12 @@ CudaRenderer::getImage() {
     return image;
 }
 
-void
-CudaRenderer::loadScene(SceneName scene) {
+void CudaRenderer::loadScene(SceneName scene) {
     sceneName = scene;
     loadCircleScene(sceneName, numberOfCircles, position, velocity, color, radius);
 }
 
-void
-CudaRenderer::setup() {
+void CudaRenderer::setup() {
 
     int deviceCount = 0;
     bool isFastGPU = false;
@@ -513,7 +574,9 @@ CudaRenderer::setup() {
         cudaDeviceProp deviceProps;
         cudaGetDeviceProperties(&deviceProps, i);
         name = deviceProps.name;
-        if (name.compare("GeForce RTX 2080") == 0)
+        //The below check has been changed to actually work. 
+        //It turns out that the reference check did not check if NVIDIA was in the device name, which messed everything up.
+        if (name.compare("NVIDIA GeForce RTX 2080") == 0)
         {
             isFastGPU = true;
         }
@@ -600,8 +663,7 @@ CudaRenderer::setup() {
 //
 // Allocate buffer the renderer will render into.  Check status of
 // image first to avoid memory leak.
-void
-CudaRenderer::allocOutputImage(int width, int height) {
+void CudaRenderer::allocOutputImage(int width, int height) {
 
     if (image)
         delete image;
@@ -612,8 +674,7 @@ CudaRenderer::allocOutputImage(int width, int height) {
 //
 // Clear the renderer's target image.  The state of the image after
 // the clear depends on the scene being rendered.
-void
-CudaRenderer::clearImage() {
+void CudaRenderer::clearImage() {
 
     // 256 threads per block is a healthy number
     dim3 blockDim(16, 16, 1);
@@ -633,8 +694,7 @@ CudaRenderer::clearImage() {
 //
 // Advance the simulation one time step.  Updates all circle positions
 // and velocities
-void
-CudaRenderer::advanceAnimation() {
+void CudaRenderer::advanceAnimation() {
      // 256 threads per block is a healthy number
     dim3 blockDim(256, 1);
     dim3 gridDim((numberOfCircles + blockDim.x - 1) / blockDim.x);
@@ -652,12 +712,15 @@ CudaRenderer::advanceAnimation() {
     cudaDeviceSynchronize();
 }
 
-void
-CudaRenderer::render() {
+void CudaRenderer::render() {
+    //Figure out the number of pixels
+    int N = image->width * image->height;
+    
     // 256 threads per block is a healthy number
     dim3 blockDim(256, 1);
-    dim3 gridDim((numberOfCircles + blockDim.x - 1) / blockDim.x);
+    dim3 gridDim((N + blockDim.x - 1) / blockDim.x);
 
-    kernelRenderCircles<<<gridDim, blockDim>>>();
+    // kernelRenderCircles<<<gridDim, blockDim>>>();
+    renderPixel<<<gridDim, blockDim>>>();
     cudaDeviceSynchronize();
 }

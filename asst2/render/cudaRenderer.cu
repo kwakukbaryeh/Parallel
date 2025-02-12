@@ -554,35 +554,47 @@ __global__ void renderTile() {
     float t = (static_cast<float>(tIdy * GRAIN_SIZE) - 0.5f) / cuConstRendererParams.imageHeight;
     float b = (static_cast<float>(tIdy * GRAIN_SIZE + GRAIN_SIZE) + 0.5f) / cuConstRendererParams.imageHeight;
 
+    int *circles = (int *)malloc(sizeof(int) * 1024);
+    int count = 0;
+
     for (int i = 0; i < cuConstRendererParams.numberOfCircles; i++) {
         float3 pos = *(float3 *)&(cuConstRendererParams.position[3 * i]);
         float rad = cuConstRendererParams.radius[i];
 
         // Check if the tile overlaps with the circles bounding box
         if (!(r < pos.x - rad || l > pos.x + rad || b < pos.y - rad || t > pos.y + rad)) {
-            int index = (tIdy * GRAIN_SIZE) * cuConstRendererParams.imageWidth + (tIdx * GRAIN_SIZE);
-            for (int row = 0; row < GRAIN_SIZE; row++) {
-                for (int col = 0; col < GRAIN_SIZE; col++) {
-                    if (tIdx * GRAIN_SIZE + col < cuConstRendererParams.imageWidth && 
-                          tIdy * GRAIN_SIZE + row < cuConstRendererParams.imageHeight) {
-                        //Calculate Center
-                        int x = tIdx * GRAIN_SIZE + col;
-                        int y = tIdy * GRAIN_SIZE + row;
-                        float2 center = make_float2((static_cast<float>(x) + 0.5f)/cuConstRendererParams.imageWidth,
-                                                    (static_cast<float>(y) + 0.5f)/cuConstRendererParams.imageHeight);
+            circles[count++] = i;
+        }
+    }
 
-                        // Check if the circle affects the pixel
-                        float diffX = pos.x - center.x;
-                        float diffY = pos.y - center.y;
-                        float dist = diffX * diffX + diffY * diffY;
-                        if (dist < rad * rad) {
-                            smartShade((float4 *)&cuConstRendererParams.imageData[index * 4], i, dist, rad, pos.z);
-                        }
+    // Now render the pixels
+    for (int c = 0; c < count; c++) {
+        int i = circles[c];
+        float3 pos = *(float3 *)&(cuConstRendererParams.position[3 * i]);
+        float rad = cuConstRendererParams.radius[i];
+
+        int index = (tIdy * GRAIN_SIZE) * cuConstRendererParams.imageWidth + (tIdx * GRAIN_SIZE);
+        for (int row = 0; row < GRAIN_SIZE; row++) {
+            for (int col = 0; col < GRAIN_SIZE; col++) {
+                if (tIdx * GRAIN_SIZE + col < cuConstRendererParams.imageWidth && 
+                        tIdy * GRAIN_SIZE + row < cuConstRendererParams.imageHeight) {
+                    //Calculate Center
+                    int x = tIdx * GRAIN_SIZE + col;
+                    int y = tIdy * GRAIN_SIZE + row;
+                    float2 center = make_float2((static_cast<float>(x) + 0.5f)/cuConstRendererParams.imageWidth,
+                                                (static_cast<float>(y) + 0.5f)/cuConstRendererParams.imageHeight);
+
+                    // Check if the circle affects the pixel
+                    float diffX = pos.x - center.x;
+                    float diffY = pos.y - center.y;
+                    float dist = diffX * diffX + diffY * diffY;
+                    if (dist < rad * rad) {
+                        smartShade((float4 *)&cuConstRendererParams.imageData[index * 4], i, dist, rad, pos.z);
                     }
-                    index++;
                 }
-                index += cuConstRendererParams.imageWidth - GRAIN_SIZE;
+                index++;
             }
+            index += cuConstRendererParams.imageWidth - GRAIN_SIZE;
         }
     }
 }

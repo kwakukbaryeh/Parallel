@@ -15,9 +15,9 @@ Device 0: NVIDIA GeForce RTX 2080
 Running benchmark, 1 frames, beginning at frame 0 ...
 Copying image data from device
 ***************** Correctness check passed **************************
-Clear:    0.0987 ms
+Clear:    0.1006 ms
 Advance:  0.0007 ms
-Render:   516.7579 ms
-Total:    516.8573 ms
+Render:   515.0157 ms
+Total:    515.1170 ms
 
-Overall:  0.8146 sec (note units are seconds)
+Overall:  0.8128 sec (note units are seconds)

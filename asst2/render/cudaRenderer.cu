@@ -462,40 +462,21 @@ __global__ void renderPixel() {
         float diffY = pos.y - center.y;
         float dist = diffX * diffX + diffY * diffY;
         if (dist < r * r) {
-            // Figure out RGB/Alpha
-            float3 rgb;
-            float alpha;
-            
-            if (cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME) {
-                const float kCircleMaxAlpha = .5f;
-                const float falloffScale = 4.f;
-
-                float normPixelDist = sqrt(dist) / r;
-                rgb = lookupColor(normPixelDist);
-
-                float maxAlpha = .6f + .4f * (1.f - pos.z);
-                maxAlpha = kCircleMaxAlpha * fmaxf(fminf(maxAlpha, 1.f), 0.f); // kCircleMaxAlpha * clamped value
-                alpha = maxAlpha * exp(-1.f * falloffScale * normPixelDist * normPixelDist);
-
-            } else {
-                // Simple: each circle has an assigned color
-                rgb = *(float3 *)&(cuConstRendererParams.color[3 * i]);
-                alpha = .5f;
-            }
-
-            // Calculate color (Atomics Not needed since this is the only thread updating this pixel)
-            float oneMinusAlpha = 1.f - alpha;
-
-            float4 *ptr = (float4 *)&cuConstRendererParams.imageData[index * 4];
-            float4 existingColor = *ptr;
-            float4 newColor;
-            newColor.x = alpha * rgb.x + oneMinusAlpha * existingColor.x;
-            newColor.y = alpha * rgb.y + oneMinusAlpha * existingColor.y;
-            newColor.z = alpha * rgb.z + oneMinusAlpha * existingColor.z;
-            newColor.w = alpha + existingColor.w;
-            *ptr = newColor;
         }
     }
+}
+
+// Tile Based Renderer
+__global__ renderTile() {
+    int tIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    int tIdy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    //Calculate the tile bounds
+    int l = tIdx * 4;
+    int r = l + 3;
+    int t = tIdy * 4;
+    int b = t + 3;
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -717,10 +698,11 @@ void CudaRenderer::render() {
     int N = image->width * image->height;
     
     // 256 threads per block is a healthy number
-    dim3 blockDim(256, 1);
-    dim3 gridDim((N + blockDim.x - 1) / blockDim.x);
+    dim3 blockDim(32, 32);
+    dim3 gridDim((image->width + blockDim.x - 1) / blockDim.x, (imgae->height + blockDim.y - 1) / blockDim.y);
 
     // kernelRenderCircles<<<gridDim, blockDim>>>();
-    renderPixel<<<gridDim, blockDim>>>();
+    // renderPixel<<<gridDim, blockDim>>>();
+    renderTile<<<gridDim, blockDim>>>();
     cudaDeviceSynchronize();
 }

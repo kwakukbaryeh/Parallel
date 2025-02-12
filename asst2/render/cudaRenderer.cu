@@ -450,7 +450,8 @@ __global__ void renderPixel() {
     // Find this pixel's center
     int y = index / cuConstRendererParams.imageWidth;
     int x = index % cuConstRendererParams.imageWidth;
-    float2 center = make_float2((static_cast<float>(x) + 0.5f)/cuConstRendererParams.imageWidth, (static_cast<float>(y) + 0.5f)/cuConstRendererParams.imageHeight);
+    float2 center = make_float2((static_cast<float>(x) + 0.5f)/cuConstRendererParams.imageWidth,
+                                (static_cast<float>(y) + 0.5f)/cuConstRendererParams.imageHeight);
 
     // Check against all the circles
     for (int i = 0; i < cuConstRendererParams.numberOfCircles; i++) {
@@ -500,9 +501,11 @@ __global__ void renderPixel() {
 
 //Smarter pixel shading (based of shade pixel)
 /**
- * 
+ * ptr - pointer to the Image
+ * i - the circle index
+ * dist - the distance of this pixels center from the circles center
  */
-__global__ smartShade(float4 *ptr, int i, float dist) {
+ __device__ __inline__ void smartShade(float4 *ptr, int i, float dist, float rad, float z) {
     float3 rgb;
     float alpha;
     
@@ -510,10 +513,10 @@ __global__ smartShade(float4 *ptr, int i, float dist) {
         const float kCircleMaxAlpha = .5f;
         const float falloffScale = 4.f;
 
-        float normPixelDist = sqrt(dist) / r;
+        float normPixelDist = sqrt(dist) / rad;
         rgb = lookupColor(normPixelDist);
 
-        float maxAlpha = .6f + .4f * (1.f - pos.z);
+        float maxAlpha = .6f + .4f * (1.f - z);
         maxAlpha = kCircleMaxAlpha * fmaxf(fminf(maxAlpha, 1.f), 0.f); // kCircleMaxAlpha * clamped value
         alpha = maxAlpha * exp(-1.f * falloffScale * normPixelDist * normPixelDist);
 
@@ -532,21 +535,56 @@ __global__ smartShade(float4 *ptr, int i, float dist) {
     newColor.y = alpha * rgb.y + oneMinusAlpha * existingColor.y;
     newColor.z = alpha * rgb.z + oneMinusAlpha * existingColor.z;
     newColor.w = alpha + existingColor.w;
+    // newColor.x = dist; newColor.y = 0; newColor.z = 0; newColor.w = 1;
     *ptr = newColor;
 }
 
 
 // Tile Based Renderer
-__global__ renderTile() {
+
+#define GRAIN_SIZE 2
+
+__global__ void renderTile() {
     int tIdx = blockIdx.x * blockDim.x + threadIdx.x;
     int tIdy = blockIdx.y * blockDim.y + threadIdx.y;
 
     //Calculate the tile bounds
-    int l = tIdx * 4;
-    int r = l + 3;
-    int t = tIdy * 4;
-    int b = t + 3;
+    float l = (static_cast<float>(tIdx * GRAIN_SIZE) - 0.5f) / cuConstRendererParams.imageWidth;
+    float r = (static_cast<float>(tIdx * GRAIN_SIZE + GRAIN_SIZE) + 0.5f) / cuConstRendererParams.imageWidth;
+    float t = (static_cast<float>(tIdy * GRAIN_SIZE) - 0.5f) / cuConstRendererParams.imageHeight;
+    float b = (static_cast<float>(tIdy * GRAIN_SIZE + GRAIN_SIZE) + 0.5f) / cuConstRendererParams.imageHeight;
 
+    for (int i = 0; i < cuConstRendererParams.numberOfCircles; i++) {
+        float3 pos = *(float3 *)&(cuConstRendererParams.position[3 * i]);
+        float rad = cuConstRendererParams.radius[i];
+
+        // Check if the tile overlaps with the circles bounding box
+        if (!(r < pos.x - rad || l > pos.x + rad || b < pos.y - rad || t > pos.y + rad)) {
+            int index = (tIdy * GRAIN_SIZE) * cuConstRendererParams.imageWidth + (tIdx * GRAIN_SIZE);
+            for (int row = 0; row < GRAIN_SIZE; row++) {
+                for (int col = 0; col < GRAIN_SIZE; col++) {
+                    if (tIdx * GRAIN_SIZE + col < cuConstRendererParams.imageWidth && 
+                          tIdy * GRAIN_SIZE + row < cuConstRendererParams.imageHeight) {
+                        //Calculate Center
+                        int x = tIdx * GRAIN_SIZE + col;
+                        int y = tIdy * GRAIN_SIZE + row;
+                        float2 center = make_float2((static_cast<float>(x) + 0.5f)/cuConstRendererParams.imageWidth,
+                                                    (static_cast<float>(y) + 0.5f)/cuConstRendererParams.imageHeight);
+
+                        // Check if the circle affects the pixel
+                        float diffX = pos.x - center.x;
+                        float diffY = pos.y - center.y;
+                        float dist = diffX * diffX + diffY * diffY;
+                        if (dist < rad * rad) {
+                            smartShade((float4 *)&cuConstRendererParams.imageData[index * 4], i, dist, rad, pos.z);
+                        }
+                    }
+                    index++;
+                }
+                index += cuConstRendererParams.imageWidth - GRAIN_SIZE;
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -765,13 +803,12 @@ void CudaRenderer::advanceAnimation() {
 
 void CudaRenderer::render() {
     //Figure out the number of pixels
-    int N = image->width * image->height;
+    // int N = image->width * image->height;
     
     // 256 threads per block is a healthy number
     dim3 blockDim(32, 32);
-    dim3 gridDim((image->width + blockDim.x - 1) / blockDim.x, (imgae->height + blockDim.y - 1) / blockDim.y);
+    dim3 gridDim((image->width + blockDim.x - 1) / blockDim.x, (image->height + blockDim.y - 1) / blockDim.y);
 
-    // kernelRenderCircles<<<gridDim, blockDim>>>();
     // renderPixel<<<gridDim, blockDim>>>();
     renderTile<<<gridDim, blockDim>>>();
     cudaDeviceSynchronize();

@@ -554,7 +554,7 @@ __global__ void renderTile() {
     float t = (static_cast<float>(tIdy * GRAIN_SIZE) - 0.5f) / cuConstRendererParams.imageHeight;
     float b = (static_cast<float>(tIdy * GRAIN_SIZE + GRAIN_SIZE) + 0.5f) / cuConstRendererParams.imageHeight;
 
-    int *circles = (int *)malloc(sizeof(int) * 1024);
+    int circles[4096];
     int count = 0;
 
     for (int i = 0; i < cuConstRendererParams.numberOfCircles; i++) {

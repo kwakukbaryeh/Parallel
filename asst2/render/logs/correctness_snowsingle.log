@@ -17,7 +17,7 @@ Copying image data from device
 ***************** Correctness check passed **************************
 Clear:    0.1009 ms
 Advance:  0.0006 ms
-Render:   530.2141 ms
-Total:    530.3157 ms
+Render:   147.8027 ms
+Total:    147.9043 ms
 
-Overall:  0.8277 sec (note units are seconds)
+Overall:  0.4472 sec (note units are seconds)

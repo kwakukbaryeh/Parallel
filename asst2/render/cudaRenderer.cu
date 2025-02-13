@@ -18,6 +18,9 @@
 #include "sceneLoader.h"
 #include "util.h"
 
+//Cuda Scan Stuff
+#define SCAN_BLOCK_DIM 1024
+#include "exclusiveScan.cu_inl"
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // All cuda kernels here
@@ -542,30 +545,34 @@ __global__ void renderPixel() {
 
 // Tile Based Renderer
 
-#define GRAIN_SIZE 2
+#define GRAIN_SIZE 32
 
 __global__ void renderTile() {
     int tIdx = blockIdx.x * blockDim.x + threadIdx.x;
     int tIdy = blockIdx.y * blockDim.y + threadIdx.y;
 
     //Calculate the tile bounds
-    float l = (static_cast<float>(tIdx * GRAIN_SIZE) - 0.5f) / cuConstRendererParams.imageWidth;
-    float r = (static_cast<float>(tIdx * GRAIN_SIZE + GRAIN_SIZE) + 0.5f) / cuConstRendererParams.imageWidth;
-    float t = (static_cast<float>(tIdy * GRAIN_SIZE) - 0.5f) / cuConstRendererParams.imageHeight;
-    float b = (static_cast<float>(tIdy * GRAIN_SIZE + GRAIN_SIZE) + 0.5f) / cuConstRendererParams.imageHeight;
+    float l = static_cast<float>(tIdx / GRAIN_SIZE) / cuConstRendererParams.imageWidth;
+    float r = static_cast<float>(tIdx / GRAIN_SIZE + GRAIN_SIZE) / cuConstRendererParams.imageWidth;
+    float t = static_cast<float>(tIdy / GRAIN_SIZE) / cuConstRendererParams.imageHeight;
+    float b = static_cast<float>(tIdy / GRAIN_SIZE + GRAIN_SIZE) / cuConstRendererParams.imageHeight;
 
-    int circles[4096];
-    int count = 0;
+    __shared__ int circles[cuConstRendererParams.numberOfCircles];
 
-    for (int i = 0; i < cuConstRendererParams.numberOfCircles; i++) {
+    for (int i = tIdy * GRAIN_SIZE + tIdx; i < cuConstRendererParams.numberOfCircles; i+= 1024) {
         float3 pos = *(float3 *)&(cuConstRendererParams.position[3 * i]);
         float rad = cuConstRendererParams.radius[i];
 
         // Check if the tile overlaps with the circles bounding box
         if (!(r < pos.x - rad || l > pos.x + rad || b < pos.y - rad || t > pos.y + rad)) {
-            circles[count++] = i;
+            circles[i] = 1;
         }
     }
+    // Synchonize Threads to ensure all the checks are done
+    __syncthreads();
+
+    //Scan over the Values
+    sharedMemExclusiveScan(tIdx * GRAIN_SIZE + tIdy, prefixSumInput, prefixSumOutput, prefixSumScratch, BLOCKSIZE);
 
     // Now render the pixels
     for (int c = 0; c < count; c++) {
@@ -577,7 +584,7 @@ __global__ void renderTile() {
         for (int row = 0; row < GRAIN_SIZE; row++) {
             for (int col = 0; col < GRAIN_SIZE; col++) {
                 if (tIdx * GRAIN_SIZE + col < cuConstRendererParams.imageWidth && 
-                        tIdy * GRAIN_SIZE + row < cuConstRendererParams.imageHeight) {
+                    tIdy * GRAIN_SIZE + row < cuConstRendererParams.imageHeight) {
                     //Calculate Center
                     int x = tIdx * GRAIN_SIZE + col;
                     int y = tIdy * GRAIN_SIZE + row;

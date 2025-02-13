@@ -585,8 +585,8 @@ __global__ void renderTile() {
 
         // Identify if the last one is filled (edge case)
         int t23 = circles[1023];
-
         __syncthreads();
+
         // Scan over the Values
         sharedMemExclusiveScan(threadIdx.y * GRAIN_SIZE + threadIdx.x, circles, indicies, scratch, 1024);
         __syncthreads();
@@ -599,9 +599,10 @@ __global__ void renderTile() {
 
         // Render this thread's pixel
         if (tIdx < cuConstRendererParams.imageWidth && tIdy < cuConstRendererParams.imageHeight) {
-            for (int j = 0; j < indicies[1023] + t23; j++) {   
-                float3 pos = *(float3 *)&(cuConstRendererParams.position[3 * circle[j]]);
-                float rad = cuConstRendererParams.radius[circle[j]];
+            for (int j = 0; j < indicies[1023] + t23; j++) {
+                int cj = circle[j];
+                float3 pos = *(float3 *)&(cuConstRendererParams.position[3 * cj]);
+                float rad = cuConstRendererParams.radius[cj];
                 float2 center = make_float2((static_cast<float>(tIdx) + 0.5f)*iimgWidth,
                                             (static_cast<float>(tIdy) + 0.5f)*iimgHeight);
 
@@ -610,7 +611,7 @@ __global__ void renderTile() {
                 float diffY = pos.y - center.y;
                 float dist = diffX * diffX + diffY * diffY;
                 if (dist < rad * rad) {
-                    smartShade(&tmp, circle[j], dist, rad, pos.z);
+                    smartShade(&tmp, cj, dist, rad, pos.z);
                 }
             }
         }

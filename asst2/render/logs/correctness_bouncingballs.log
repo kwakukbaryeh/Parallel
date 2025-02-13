@@ -12,10 +12,10 @@ Device 0: NVIDIA GeForce RTX 2080
 
 Running benchmark, 1 frames, beginning at frame 0 ...
 Copying image data from device
-Mismatch detected at pixel [210][0], value = 0.500000, expected 1.000000 for color Red
-Mismatch detected at pixel [210][0], value = 0.500000, expected 1.000000 for color Blue
-Mismatch detected at pixel [210][1], value = 0.500000, expected 1.000000 for color Red
-Mismatch detected at pixel [210][1], value = 0.500000, expected 1.000000 for color Blue
-Mismatch detected at pixel [211][0], value = 0.500000, expected 1.000000 for color Red
-Mismatch detected at pixel [211][0], value = 0.500000, expected 1.000000 for color Blue
-ERROR : Mismatch detected between reference and actual
+***************** Correctness check passed **************************
+Clear:    0.0937 ms
+Advance:  0.0137 ms
+Render:   0.1389 ms
+Total:    0.2463 ms
+
+Overall:  0.0170 sec (note units are seconds)

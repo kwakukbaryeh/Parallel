@@ -12,7 +12,7 @@
 #include <chrono>
 #include <string>
 #include <vector>
-
+#include <climits>   
 #include <unistd.h>
 #include <omp.h>
 
@@ -106,43 +106,77 @@ std::vector<std::pair<int, int>> find_best_route(const Wire& wire,
                                                  int dim_x, int dim_y, double SA_prob) {
     int x = wire.start_x, y = wire.start_y;
     int end_x = wire.end_x, end_y = wire.end_y;
-    
-    std::vector<std::pair<int, int>> route;
-    route.push_back({x, y});  // Start point
-    
-    // Simple greedy approach with simulated annealing
-    while (x != end_x || y != end_y) {
-        std::vector<std::pair<int, int>> possible_moves;
 
-        // Generate possible moves (right, left, up, down)
-        if (x < end_x) possible_moves.push_back({x + 1, y});  // Move right
-        if (x > end_x) possible_moves.push_back({x - 1, y});  // Move left
-        if (y < end_y) possible_moves.push_back({x, y + 1});  // Move down
-        if (y > end_y) possible_moves.push_back({x, y - 1});  // Move up
+    std::vector<std::pair<int, int>> best_route;
+    int min_cost = INT_MAX;
 
-        // Sort moves by occupancy to prefer less crowded paths
-        std::sort(possible_moves.begin(), possible_moves.end(), [&](const auto& a, const auto& b) {
-            return occupancy[a.second][a.first] < occupancy[b.second][b.first];
-        });
+    // Define bounding box
+    int min_x = std::min(x, end_x);
+    int max_x = std::max(x, end_x);
+    int min_y = std::min(y, end_y);
+    int max_y = std::max(y, end_y);
 
-        // Apply simulated annealing: occasionally pick a non-optimal move
-        if (!possible_moves.empty()) {
-            if ((rand() / (double)RAND_MAX) < SA_prob) {
-                int random_index = rand() % possible_moves.size();
-                x = possible_moves[random_index].first;
-                y = possible_moves[random_index].second;
-            } else {
-                x = possible_moves[0].first;
-                y = possible_moves[0].second;
-            }
-            route.push_back({x, y});
-        } else {
-            // If no valid moves, break (this should not happen in a valid grid)
-            break;
+    // Possible paths: (L-shape and Z-shape options)
+    std::vector<std::vector<std::pair<int, int>>> candidate_routes;
+
+    // Path 1: Horizontal first, then vertical (L-shape)
+    std::vector<std::pair<int, int>> path1;
+    int temp_x = x, temp_y = y;
+    while (temp_x != end_x) {
+        temp_x += (temp_x < end_x) ? 1 : -1;
+        path1.push_back({temp_x, temp_y});
+    }
+    while (temp_y != end_y) {
+        temp_y += (temp_y < end_y) ? 1 : -1;
+        path1.push_back({temp_x, temp_y});
+    }
+    candidate_routes.push_back(path1);
+
+    // Path 2: Vertical first, then horizontal (L-shape)
+    std::vector<std::pair<int, int>> path2;
+    temp_x = x, temp_y = y;
+    while (temp_y != end_y) {
+        temp_y += (temp_y < end_y) ? 1 : -1;
+        path2.push_back({temp_x, temp_y});
+    }
+    while (temp_x != end_x) {
+        temp_x += (temp_x < end_x) ? 1 : -1;
+        path2.push_back({temp_x, temp_y});
+    }
+    candidate_routes.push_back(path2);
+
+    // Path 3: Two-bend Z-shape (if needed)
+    std::vector<std::pair<int, int>> path3;
+    temp_x = x, temp_y = y;
+
+    int mid_x = (x + end_x) / 2;  // Midpoint to introduce a second bend
+    while (temp_x != mid_x) {
+        temp_x += (temp_x < mid_x) ? 1 : -1;
+        path3.push_back({temp_x, temp_y});
+    }
+    while (temp_y != end_y) {
+        temp_y += (temp_y < end_y) ? 1 : -1;
+        path3.push_back({temp_x, temp_y});
+    }
+    while (temp_x != end_x) {
+        temp_x += (temp_x < end_x) ? 1 : -1;
+        path3.push_back({temp_x, temp_y});
+    }
+    candidate_routes.push_back(path3);
+
+    // Choose the least congested path
+    for (const auto& route : candidate_routes) {
+        int cost = 0;
+        for (const auto& point : route) {
+            cost += occupancy[point.second][point.first]; // Lower is better
+        }
+        if (cost < min_cost) {
+            min_cost = cost;
+            best_route = route;
         }
     }
 
-    return route;
+    return best_route;
 }
 
 void route_wires_across(std::vector<Wire>& wires, std::vector<std::vector<int>>& occupancy, 
@@ -260,6 +294,13 @@ int main(int argc, char *argv[]) {
    */
    if (parallel_mode == 'A') {
     route_wires_across(wires, occupancy, dim_x, dim_y, num_threads, batch_size, SA_prob, SA_iters);
+    printf("DEBUG GRID (Wire Across):\n");
+      for (int i = 0; i < dim_y; i++) {
+          for (int j = 0; j < dim_x; j++) {
+              printf("%d ", occupancy[i][j]);
+          }
+          printf("\n");
+      }
   } else {
     route_wires_within(wires, occupancy, dim_x, dim_y, num_threads, SA_prob, SA_iters);
   }

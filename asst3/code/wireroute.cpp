@@ -1,6 +1,6 @@
 /**
  * Parallel VLSI Wire Routing via OpenMP
- * Name 1(andrew_id 1), Name 2(andrew_id 2)
+ * Kwaku Baryeh(kbaryeh), Parth Iyer(pniyer)
  */
 
 #include "wireroute.h"
@@ -89,6 +89,90 @@ void write_output(const std::vector<Wire>& wires, const int num_wires, const std
   out_wires.close();
 }
 
+void route_wires_within(std::vector<Wire>& wires, std::vector<std::vector<int>>& occupancy, 
+  int dim_x, int dim_y, int num_threads, double SA_prob, int SA_iters) {
+    std::cout << "route_wires_within() is not implemented yet.\n";
+}
+
+void update_occupancy(std::vector<std::vector<int>>& occupancy, const std::vector<std::pair<int, int>>& route) {
+  for (const auto& point : route) {
+      int x = point.first, y = point.second;  // Correct way to access x and y
+      occupancy[y][x]++;  // Increment occupancy at this point
+  }
+}
+
+std::vector<std::pair<int, int>> find_best_route(const Wire& wire, 
+                                                 const std::vector<std::vector<int>>& occupancy, 
+                                                 int dim_x, int dim_y, double SA_prob) {
+    int x = wire.start_x, y = wire.start_y;
+    int end_x = wire.end_x, end_y = wire.end_y;
+    
+    std::vector<std::pair<int, int>> route;
+    route.push_back({x, y});  // Start point
+    
+    // Simple greedy approach with simulated annealing
+    while (x != end_x || y != end_y) {
+        std::vector<std::pair<int, int>> possible_moves;
+
+        // Generate possible moves (right, left, up, down)
+        if (x < end_x) possible_moves.push_back({x + 1, y});  // Move right
+        if (x > end_x) possible_moves.push_back({x - 1, y});  // Move left
+        if (y < end_y) possible_moves.push_back({x, y + 1});  // Move down
+        if (y > end_y) possible_moves.push_back({x, y - 1});  // Move up
+
+        // Sort moves by occupancy to prefer less crowded paths
+        std::sort(possible_moves.begin(), possible_moves.end(), [&](const auto& a, const auto& b) {
+            return occupancy[a.second][a.first] < occupancy[b.second][b.first];
+        });
+
+        // Apply simulated annealing: occasionally pick a non-optimal move
+        if (!possible_moves.empty()) {
+            if ((rand() / (double)RAND_MAX) < SA_prob) {
+                int random_index = rand() % possible_moves.size();
+                x = possible_moves[random_index].first;
+                y = possible_moves[random_index].second;
+            } else {
+                x = possible_moves[0].first;
+                y = possible_moves[0].second;
+            }
+            route.push_back({x, y});
+        } else {
+            // If no valid moves, break (this should not happen in a valid grid)
+            break;
+        }
+    }
+
+    return route;
+}
+
+void route_wires_across(std::vector<Wire>& wires, std::vector<std::vector<int>>& occupancy, 
+                        int dim_x, int dim_y, int num_threads, int batch_size, 
+                        double SA_prob, int SA_iters) {
+    #pragma omp parallel num_threads(num_threads)
+    {
+        for (int timestep = 0; timestep < SA_iters; timestep++) {
+            #pragma omp for schedule(dynamic)
+            for (int batch_start = 0; batch_start < wires.size(); batch_start += batch_size) {
+                std::vector<std::vector<std::pair<int, int>>> batch_routes(batch_size);  // Corrected type
+
+                // Step 1: Compute new routes for batch wires
+                for (int i = 0; i < batch_size && (batch_start + i) < wires.size(); i++) {
+                    int wire_idx = batch_start + i;
+                    batch_routes[i] = find_best_route(wires[wire_idx], occupancy, dim_x, dim_y, SA_prob);
+                }
+
+                // Step 2: Synchronize update of occupancy matrix
+                #pragma omp critical
+                {
+                    for (int i = 0; i < batch_size && (batch_start + i) < wires.size(); i++) {
+                        update_occupancy(occupancy, batch_routes[i]); // Now correctly passing std::vector<std::pair<int, int>>
+                    }
+                }
+            }
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
   const auto init_start = std::chrono::steady_clock::now();
 
@@ -174,6 +258,11 @@ int main(int argc, char *argv[]) {
    * Don't use global variables.
    * Use OpenMP to parallelize the algorithm. 
    */
+   if (parallel_mode == 'A') {
+    route_wires_across(wires, occupancy, dim_x, dim_y, num_threads, batch_size, SA_prob, SA_iters);
+  } else {
+    route_wires_within(wires, occupancy, dim_x, dim_y, num_threads, SA_prob, SA_iters);
+  }
 
   const double compute_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - compute_start).count();
   std::cout << "Computation time (sec): " << compute_time << '\n';

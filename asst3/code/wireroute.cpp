@@ -16,6 +16,7 @@
 
 #include <unistd.h>
 #include <omp.h>
+#include <stdlib.h>
 
 // Point Data Structure
 struct Point {
@@ -48,8 +49,9 @@ void print_stats(const std::vector<std::vector<int>>& occupancy) {
 //Get Path for a wire
 std::vector<Point> get_path(Wire w) {
     std::vector<Point> path;
-    path.push_back({w.start_x, w.start_y});
 
+    Point start = {w.start_x, w.start_y};
+    Point bend1 = {w.bend1_x, w.bend1_y};
     Point bend2;
 
     if (w.start_x == w.bend1_x) {
@@ -60,80 +62,90 @@ std::vector<Point> get_path(Wire w) {
       bend2.y = w.end_y;
     }
 
-    if (w.start_x == w.bend1_x) { 
-        for (int y = std::min(w.start_y, w.bend1_y); y <= std::max(w.start_y, w.bend1_y); ++y) {
-            path.push_back({w.start_x, y});
-        }
+    Point end = {w.end_x, w.end_y};
+
+    int x_dir = start.x - end.x > 0 ? -1 : 1;
+    int y_dir = start.y - end.y > 0 ? -1 : 1;
+
+    if (start.x == bend1.x) { 
+        for (int y = start.y; y_dir < 0 ? bend1.y < y : y < bend1.y; y += y_dir)
+            path.push_back({start.x, y});
     } else { 
-        for (int x = std::min(w.start_x, w.bend1_x); x <= std::max(w.start_x, w.bend1_x); ++x) {
-            path.push_back({x, w.start_y});
-        }
+        for (int x = start.x; x_dir < 0 ? bend1.x < x : x < bend1.x; x += x_dir)
+            path.push_back({x, start.y});
     }
 
-    if (w.bend1_x == bend2.x) { 
-        for (int y = std::min(w.bend1_y, bend2.y); y <= std::max(w.bend1_y, bend2.y); ++y) {
-            path.push_back({w.bend1_x, y});
-        }
+    if (bend1.x == bend2.x) { 
+        for (int y = bend1.y; y_dir < 0 ? bend2.y < y : y < bend2.y; y += y_dir)
+            path.push_back({bend1.x, y});
     } else { 
-        for (int x = std::min(w.bend1_x, bend2.x); x <= std::max(w.bend1_x, bend2.x); ++x) {
-            path.push_back({x, w.bend1_y});
-        }
+        for (int x = bend1.x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir)
+            path.push_back({x, bend1.y});
     }
 
-    if (bend2.x == w.end_x) {
-      for (int y = std::min(bend2.y, w.end_y); y <= std::max(bend2.y, w.end_y); ++y) {
-          path.push_back({bend2.x, y});
-      }
+    if (bend2.x == end.x) { 
+        for (int y = bend2.y; y_dir < 0 ? end.y < y : y < end.y; y += y_dir)
+            path.push_back({bend2.x, y});
     } else { 
-        for (int x = std::min(bend2.x, w.end_x); x <= std::max(bend2.x, w.end_x); ++x) {
+        for (int x = bend2.x; x_dir < 0 ? end.x < x : x < end.x; x += x_dir)
             path.push_back({x, bend2.y});
-        }
     }
-    
+
+    path.push_back(end);
     return path;
 }
 
 //Route Wires per wire parallelism
-void w_route(std::vector<Wire> &w, int *grid, Point dim) {
+void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim) {
     for(size_t i = 0; i < w.size(); i++) {
-        
         //Remove wire from grid if present
         if (w[i].start_x != w[i].bend1_x || w[i].start_y != w[i].bend1_y) {
             std::vector<Point> path = get_path(w[i]);
             for (Point p : path)
-                grid[p.y * dim.x + p.x]--;
+                grid[p.y][p.x]--;
         }
 
         int minCost = INT_MAX;
-        Wire minWire = w[0];
+        Wire minWire = w[i];
 
-        //Check Horizontal
-        for(int x = std::min(w[i].start_x, w[i].end_x); x <= std::max(w[i].start_x, w[i].end_x); ++x) {
-            Wire wire = w[i];
-            wire.bend1_x = x;
-            wire.bend1_y = w[i].start_y;
-            std::vector<Point> path = get_path(wire);
-            int cost = 0;
-            for(Point p : path)
-                cost += grid[p.y * dim.x + p.x] * grid[p.y * dim.x + p.x];
-            if (cost < minCost) {
-                minWire = wire;
-                minCost = cost;
+        if (((double) random())/((double) RAND_MAX) < SA_prob) {
+            Point dirs = {w[i].end_x - w[i].start_x, w[i].end_y - w[i].start_y};
+            if (((double) random())/((double) RAND_MAX) > 0.5) {
+                //Vertical
+                w[i].bend1_y = (int) (dirs.y * ((double) random())/((double) RAND_MAX)) + 1;
+            } else {
+                //Horizontal
+                w[i].bend1_x = (int) (dirs.x * ((double) random())/((double) RAND_MAX)) + 1;
             }
-        }
+        } else {
+            //Check Horizontal
+            for(int x = std::min(w[i].start_x, w[i].end_x); x <= std::max(w[i].start_x, w[i].end_x); ++x) {
+                Wire wire = w[i];
+                wire.bend1_x = x;
+                wire.bend1_y = w[i].start_y;
+                std::vector<Point> path = get_path(wire);
+                int cost = 0;
+                for(Point p : path)
+                    cost += grid[p.y][p.x] * grid[p.y][p.x];
+                if (cost < minCost) {
+                    minWire = wire;
+                    minCost = cost;
+                }
+            }
 
-        //Check Vertical
-        for(int y = std::min(w[i].start_y, w[i].end_y); y <= std::max(w[i].start_y, w[i].end_y); ++y) {
-            Wire wire = w[i];
-            wire.bend1_x = w[i].start_x;
-            wire.bend1_y = y;
-            std::vector<Point> path = get_path(wire);
-            int cost = 0;
-            for(Point p : path)
-                cost += grid[p.y * dim.x + p.x] * grid[p.y * dim.x + p.x];
-            if (cost < minCost) {
-                minWire = wire;
-                minCost = cost;
+            //Check Vertical
+            for(int y = std::min(w[i].start_y, w[i].end_y); y <= std::max(w[i].start_y, w[i].end_y); ++y) {
+                Wire wire = w[i];
+                wire.bend1_x = w[i].start_x;
+                wire.bend1_y = y;
+                std::vector<Point> path = get_path(wire);
+                int cost = 0;
+                for(Point p : path)
+                    cost += grid[p.y][p.x] * grid[p.y][p.x];
+                if (cost < minCost) {
+                    minWire = wire;
+                    minCost = cost;
+                }
             }
         }
 
@@ -141,7 +153,7 @@ void w_route(std::vector<Wire> &w, int *grid, Point dim) {
         w[i] = minWire;
         std::vector<Point> path = get_path(minWire);
         for(Point p : path)
-            grid[p.y * dim.x + p.x]++;
+            grid[p.y][p.x]++;
     }
 }
 
@@ -204,6 +216,7 @@ void write_output(const std::vector<Wire>& wires, const int num_wires, const std
 }
 
 int main(int argc, char *argv[]) {
+    srandom(0);
     const auto init_start = std::chrono::steady_clock::now();
 
     std::string input_filename;
@@ -276,7 +289,6 @@ int main(int argc, char *argv[]) {
     }
 
     /* Initialize any additional data structures needed in the algorithm */
-    int *grid = (int *)calloc(dim_x * dim_y, sizeof(int));
 
     const double init_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - init_start).count();
     std::cout << "Initialization time (sec): " << std::fixed << std::setprecision(10) << init_time << '\n';
@@ -290,11 +302,12 @@ int main(int argc, char *argv[]) {
     * Use OpenMP to parallelize the algorithm. 
     */
     if (parallel_mode == 'W') {
-        w_route(wires, grid, {dim_x, dim_y});
+        for (int i = 0; i < SA_iters; i++)
+            w_route(wires, occupancy, SA_prob, {dim_x, dim_y});
         printf("DEBUG GRID\n");
         for(int i = 0; i < dim_y; i++) {
             for (int j = 0; j < dim_x; j++) {
-                printf("%d", grid[i * dim_y + j]);
+                printf("%d", occupancy[i][j]);
             }
             printf("\n");
         }

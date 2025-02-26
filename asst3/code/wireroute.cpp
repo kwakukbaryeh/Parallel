@@ -246,13 +246,23 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
 void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int t, int it) {
     for(size_t i = 0; i < w.size(); i++) {
         //Remove wire from grid if present
-        // /*
-        if (w[i].start_x != w[i].bend1_x || w[i].start_y != w[i].bend1_y) {
-            write_wire(w[i], -1, grid);
+        if (it == 0) {
+            if (w[i].start_x == w[i].end_x) {
+                //Vertical Line
+                write_wire(w[i], 1, grid);
+            } else if (w[i].start_y == w[i].end_y) {
+                //Horizontal Line
+                write_wire(w[i], 1, grid);
+            }
+        } else if (it > 1) {
+            if (w[i].start_x == w[i].end_x || w[i].start_y == w[i].end_y) {
+                continue;
+            } else {
+                write_wire(w[i], -1, grid);
+            }
         }
-        //*/
 
-        WireCost minCost = {get_cost(w[i], grid), w[i]};
+        WireCost minCost;
 
         #pragma omp declare reduction(min_cost : WireCost : omp_out = (omp_out.c < omp_in.c) ? omp_out : omp_in) initializer(omp_priv={INT_MAX, {0,0,0,0,0,0}})
 
@@ -266,6 +276,7 @@ void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
                 w[i].bend1_x = (int) (dirs.x * (double) random()/RAND_MAX);
             }
         } else {
+            minCost = {get_cost(w[i], grid), w[i]};
             Point dir = {(w[i].end_x - w[i].start_x > 0 ? 1 : -1), (w[i].end_y - w[i].start_y > 0 ? 1 : -1)};
             //Check Horizontal
             if (dir.x > 0) {

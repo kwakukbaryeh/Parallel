@@ -95,15 +95,142 @@ std::vector<Point> get_path(Wire w) {
     return path;
 }
 
+//Write the wire to the occupancy matrix
+static inline void write_wire(Wire w, int v, std::vector<std::vector<int>>& grid) {
+    std::vector<Point> path;
+
+    Point start = {w.start_x, w.start_y};
+    Point bend1 = {w.bend1_x, w.bend1_y};
+    Point bend2;
+
+    if (w.start_x == w.bend1_x) {
+      bend2.x = w.end_x;
+      bend2.y = w.bend1_y;
+    } else {
+      bend2.x = w.bend1_x;
+      bend2.y = w.end_y;
+    }
+
+    Point end = {w.end_x, w.end_y};
+
+    int x_dir = start.x - end.x > 0 ? -1 : 1;
+    int y_dir = start.y - end.y > 0 ? -1 : 1;
+
+    if (start.x == bend1.x) { 
+        for (int y = start.y; y_dir < 0 ? bend1.y < y : y < bend1.y; y += y_dir)
+            grid[y][start.x] += v;
+
+    } else { 
+        for (int x = start.x; x_dir < 0 ? bend1.x < x : x < bend1.x; x += x_dir)
+            grid[start.y][x] += v;
+    }
+
+    if (bend1.x == bend2.x) { 
+        for (int y = bend1.y; y_dir < 0 ? bend2.y < y : y < bend2.y; y += y_dir)
+            grid[y][bend1.x] += v;
+    } else { 
+        for (int x = bend1.x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir)
+            grid[bend1.y][x] += v;
+    }
+
+    if (bend2.x == end.x) { 
+        for (int y = bend2.y; y_dir < 0 ? end.y < y : y < end.y; y += y_dir)
+            grid[y][bend2.x] += v;
+    } else { 
+        for (int x = bend2.x; x_dir < 0 ? end.x < x : x < end.x; x += x_dir)
+            grid[bend2.y][x] += v;
+    }
+
+    grid[end.y][end.x] += v;
+}
+
+//Get the cost of a wire route
+static inline int get_cost(Wire w, std::vector<std::vector<int>>& grid) {
+    std::vector<Point> path;
+
+    Point start = {w.start_x, w.start_y};
+    Point bend1 = {w.bend1_x, w.bend1_y};
+    Point bend2;
+
+    if (w.start_x == w.bend1_x) {
+      bend2.x = w.end_x;
+      bend2.y = w.bend1_y;
+    } else {
+      bend2.x = w.bend1_x;
+      bend2.y = w.end_y;
+    }
+
+    Point end = {w.end_x, w.end_y};
+
+    int x_dir = start.x - end.x > 0 ? -1 : 1;
+    int y_dir = start.y - end.y > 0 ? -1 : 1;
+
+    int cost = 0;
+    int sq;
+
+    if (start.x == bend1.x) { 
+        for (int y = start.y; y_dir < 0 ? bend1.y < y : y < bend1.y; y += y_dir){
+            sq = grid[y][start.x];
+            cost += sq * sq;
+        }
+
+    } else { 
+        for (int x = start.x; x_dir < 0 ? bend1.x < x : x < bend1.x; x += x_dir) {
+            sq = grid[start.y][x];
+            cost += sq * sq;
+        }
+    }
+
+    if (bend1.x == bend2.x) { 
+        for (int y = bend1.y; y_dir < 0 ? bend2.y < y : y < bend2.y; y += y_dir) {
+            sq = grid[y][bend1.x];
+            cost += sq * sq;
+        }
+    } else { 
+        for (int x = bend1.x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir) {
+            sq = grid[bend1.y][x];
+            cost += sq * sq;
+        }
+    }
+
+    if (bend2.x == end.x) { 
+        for (int y = bend2.y; y_dir < 0 ? end.y < y : y < end.y; y += y_dir) {
+            sq = grid[y][bend2.x];
+            cost += sq * sq;
+        }
+    } else { 
+        for (int x = bend2.x; x_dir < 0 ? end.x < x : x < end.x; x += x_dir) {
+            sq = grid[bend2.y][x];
+            cost += sq * sq;
+        }
+    }
+
+    sq = grid[end.y][end.x];
+    cost += sq * sq;
+    return cost;
+}
+
 //Route Wires per wire parallelism
 void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int t) {
     for(size_t i = 0; i < w.size(); i++) {
-        //Remove wire from grid if present
-        if (w[i].start_x != w[i].bend1_x || w[i].start_y != w[i].bend1_y) {
-            std::vector<Point> path = get_path(w[i]);
-            for (Point p : path)
-                grid[p.y][p.x]--;
+        /*
+        if (w[i].start_x == w[i].bend1_x && w[i].start_y == w[i].bend1_y) {
+            if (w[i].start_x == w[i].end_x || w[i].start_y == w[i].end_y) {
+                w[i].bend1_x = w[i].end_x;
+                w[i].bend1_y = w[i].end_y;
+                write_wire(w[i], 1, grid);
+                continue;
+            }
+        } else {
+            write_wire(w[i], -1, grid);
         }
+        */
+        //Remove wire from grid if present
+        // /*
+        if (w[i].start_x != w[i].bend1_x || w[i].start_y != w[i].bend1_y) {
+            write_wire(w[i], -1, grid);
+        }
+        //*/
 
         int minCost = INT_MAX;
         Wire minWire = w[i];
@@ -119,16 +246,14 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
             }
         } else {
             Point dir = {(w[i].end_x - w[i].start_x > 0 ? 1 : -1), (w[i].end_y - w[i].start_y > 0 ? 1 : -1)};
+            int cost;
             //Check Horizontal
             if (dir.x > 0) {
                 for(int x = w[i].start_x + dir.x; x <= w[i].end_x; x += dir.x) {
                     Wire wire = w[i];
                     wire.bend1_x = x;
                     wire.bend1_y = w[i].start_y;
-                    std::vector<Point> path = get_path(wire);
-                    int cost = 0;
-                    for(Point p : path)
-                        cost += grid[p.y][p.x] * grid[p.y][p.x];
+                    cost = get_cost(wire, grid);
                     if (cost < minCost) {
                         minWire = wire;
                         minCost = cost;
@@ -139,10 +264,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
                     Wire wire = w[i];
                     wire.bend1_x = x;
                     wire.bend1_y = w[i].start_y;
-                    std::vector<Point> path = get_path(wire);
-                    int cost = 0;
-                    for(Point p : path)
-                        cost += grid[p.y][p.x] * grid[p.y][p.x];
+                    cost = get_cost(wire, grid);
                     if (cost < minCost) {
                         minWire = wire;
                         minCost = cost;
@@ -157,10 +279,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
                     Wire wire = w[i];
                     wire.bend1_x = w[i].start_x;
                     wire.bend1_y = y;
-                    std::vector<Point> path = get_path(wire);
-                    int cost = 0;
-                    for(Point p : path)
-                        cost += grid[p.y][p.x] * grid[p.y][p.x];
+                    cost = get_cost(wire, grid);
                     if (cost < minCost) {
                         minWire = wire;
                         minCost = cost;
@@ -171,10 +290,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
                     Wire wire = w[i];
                     wire.bend1_x = w[i].start_x;
                     wire.bend1_y = y;
-                    std::vector<Point> path = get_path(wire);
-                    int cost = 0;
-                    for(Point p : path)
-                        cost += grid[p.y][p.x] * grid[p.y][p.x];
+                    cost = get_cost(wire, grid);
                     if (cost < minCost) {
                         minWire = wire;
                         minCost = cost;
@@ -185,9 +301,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
 
         //Add new wire to grid and wires
         w[i] = minWire;
-        std::vector<Point> path = get_path(minWire);
-        for(Point p : path)
-            grid[p.y][p.x]++;
+        write_wire(w[i], 1, grid);
         
         
         /*

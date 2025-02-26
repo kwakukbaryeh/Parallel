@@ -23,6 +23,12 @@ struct Point {
     int x,y;
 };
 
+// Wire cost Structure
+struct WireCost {
+    int c;
+    Wire w;
+};
+
 void print_point(Point p) {
     printf("(%d,%d)", p.x, p.y);
 }
@@ -46,61 +52,10 @@ void print_stats(const std::vector<std::vector<int>>& occupancy) {
     std::cout << "Total cost: " << total_cost << '\n';
 }
 
-//Get Path for a wire
-std::vector<Point> get_path(Wire w) {
-    std::vector<Point> path;
-
-    Point start = {w.start_x, w.start_y};
-    Point bend1 = {w.bend1_x, w.bend1_y};
-    Point bend2;
-
-    if (w.start_x == w.bend1_x) {
-      bend2.x = w.end_x;
-      bend2.y = w.bend1_y;
-    } else {
-      bend2.x = w.bend1_x;
-      bend2.y = w.end_y;
-    }
-
-    Point end = {w.end_x, w.end_y};
-
-    int x_dir = start.x - end.x > 0 ? -1 : 1;
-    int y_dir = start.y - end.y > 0 ? -1 : 1;
-
-    if (start.x == bend1.x) { 
-        for (int y = start.y; y_dir < 0 ? bend1.y < y : y < bend1.y; y += y_dir)
-            path.push_back({start.x, y});
-    } else { 
-        for (int x = start.x; x_dir < 0 ? bend1.x < x : x < bend1.x; x += x_dir)
-            path.push_back({x, start.y});
-    }
-
-    if (bend1.x == bend2.x) { 
-        for (int y = bend1.y; y_dir < 0 ? bend2.y < y : y < bend2.y; y += y_dir)
-            path.push_back({bend1.x, y});
-    } else { 
-        for (int x = bend1.x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir)
-            path.push_back({x, bend1.y});
-    }
-
-    if (bend2.x == end.x) { 
-        for (int y = bend2.y; y_dir < 0 ? end.y < y : y < end.y; y += y_dir)
-            path.push_back({bend2.x, y});
-    } else { 
-        for (int x = bend2.x; x_dir < 0 ? end.x < x : x < end.x; x += x_dir)
-            path.push_back({x, bend2.y});
-    }
-
-    path.push_back(end);
-    return path;
-}
-
 //Write the wire to the occupancy matrix
 static inline void write_wire(Wire w, int v, std::vector<std::vector<int>>& grid) {
     std::vector<Point> path;
 
-    Point start = {w.start_x, w.start_y};
-    Point bend1 = {w.bend1_x, w.bend1_y};
     Point bend2;
 
     if (w.start_x == w.bend1_x) {
@@ -111,45 +66,41 @@ static inline void write_wire(Wire w, int v, std::vector<std::vector<int>>& grid
       bend2.y = w.end_y;
     }
 
-    Point end = {w.end_x, w.end_y};
+    int x_dir = w.start_x - w.end_x > 0 ? -1 : 1;
+    int y_dir = w.start_y - w.end_y > 0 ? -1 : 1;
 
-    int x_dir = start.x - end.x > 0 ? -1 : 1;
-    int y_dir = start.y - end.y > 0 ? -1 : 1;
-
-    if (start.x == bend1.x) { 
-        for (int y = start.y; y_dir < 0 ? bend1.y < y : y < bend1.y; y += y_dir)
-            grid[y][start.x] += v;
+    if (w.start_x == w.bend1_x) { 
+        for (int y = w.start_y; y_dir < 0 ? w.bend1_y < y : y < w.bend1_y; y += y_dir)
+            grid[y][w.start_x] += v;
 
     } else { 
-        for (int x = start.x; x_dir < 0 ? bend1.x < x : x < bend1.x; x += x_dir)
-            grid[start.y][x] += v;
+        for (int x = w.start_x; x_dir < 0 ? w.bend1_x < x : x < w.bend1_x; x += x_dir)
+            grid[w.start_y][x] += v;
     }
 
-    if (bend1.x == bend2.x) { 
-        for (int y = bend1.y; y_dir < 0 ? bend2.y < y : y < bend2.y; y += y_dir)
-            grid[y][bend1.x] += v;
+    if (w.bend1_x == bend2.x) { 
+        for (int y = w.bend1_y; y_dir < 0 ? bend2.y < y : y < bend2.y; y += y_dir)
+            grid[y][w.bend1_x] += v;
     } else { 
-        for (int x = bend1.x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir)
-            grid[bend1.y][x] += v;
+        for (int x = w.bend1_x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir)
+            grid[w.bend1_y][x] += v;
     }
 
-    if (bend2.x == end.x) { 
-        for (int y = bend2.y; y_dir < 0 ? end.y < y : y < end.y; y += y_dir)
+    if (bend2.x == w.end_x) { 
+        for (int y = bend2.y; y_dir < 0 ? w.end_y < y : y < w.end_y; y += y_dir)
             grid[y][bend2.x] += v;
     } else { 
-        for (int x = bend2.x; x_dir < 0 ? end.x < x : x < end.x; x += x_dir)
+        for (int x = bend2.x; x_dir < 0 ? w.end_x < x : x < w.end_x; x += x_dir)
             grid[bend2.y][x] += v;
     }
 
-    grid[end.y][end.x] += v;
+    grid[w.end_y][w.end_x] += v;
 }
 
 //Get the cost of a wire route
 static inline int get_cost(Wire w, std::vector<std::vector<int>>& grid) {
     std::vector<Point> path;
 
-    Point start = {w.start_x, w.start_y};
-    Point bend1 = {w.bend1_x, w.bend1_y};
     Point bend2;
 
     if (w.start_x == w.bend1_x) {
@@ -160,71 +111,57 @@ static inline int get_cost(Wire w, std::vector<std::vector<int>>& grid) {
       bend2.y = w.end_y;
     }
 
-    Point end = {w.end_x, w.end_y};
-
-    int x_dir = start.x - end.x > 0 ? -1 : 1;
-    int y_dir = start.y - end.y > 0 ? -1 : 1;
+    int x_dir = w.start_x - w.end_x > 0 ? -1 : 1;
+    int y_dir = w.start_y - w.end_y > 0 ? -1 : 1;
 
     int cost = 0;
     int sq;
 
-    if (start.x == bend1.x) { 
-        for (int y = start.y; y_dir < 0 ? bend1.y < y : y < bend1.y; y += y_dir){
-            sq = grid[y][start.x];
+    if (w.start_x == w.bend1_x) { 
+        for (int y = w.start_y; y_dir < 0 ? w.bend1_y < y : y < w.bend1_y; y += y_dir){
+            sq = grid[y][w.start_x] + 1;
             cost += sq * sq;
         }
 
     } else { 
-        for (int x = start.x; x_dir < 0 ? bend1.x < x : x < bend1.x; x += x_dir) {
-            sq = grid[start.y][x];
+        for (int x = w.start_x; x_dir < 0 ? w.bend1_x < x : x < w.bend1_x; x += x_dir) {
+            sq = grid[w.start_y][x] + 1;
             cost += sq * sq;
         }
     }
 
-    if (bend1.x == bend2.x) { 
-        for (int y = bend1.y; y_dir < 0 ? bend2.y < y : y < bend2.y; y += y_dir) {
-            sq = grid[y][bend1.x];
+    if (w.bend1_x == bend2.x) { 
+        for (int y = w.bend1_y; y_dir < 0 ? bend2.y < y : y < bend2.y; y += y_dir) {
+            sq = grid[y][w.bend1_x] + 1;
             cost += sq * sq;
         }
     } else { 
-        for (int x = bend1.x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir) {
-            sq = grid[bend1.y][x];
+        for (int x = w.bend1_x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir) {
+            sq = grid[w.bend1_y][x] + 1;
             cost += sq * sq;
         }
     }
 
-    if (bend2.x == end.x) { 
-        for (int y = bend2.y; y_dir < 0 ? end.y < y : y < end.y; y += y_dir) {
-            sq = grid[y][bend2.x];
+    if (bend2.x == w.end_x) { 
+        for (int y = bend2.y; y_dir < 0 ? w.end_y < y : y < w.end_y; y += y_dir) {
+            sq = grid[y][bend2.x] + 1;
             cost += sq * sq;
         }
     } else { 
-        for (int x = bend2.x; x_dir < 0 ? end.x < x : x < end.x; x += x_dir) {
-            sq = grid[bend2.y][x];
+        for (int x = bend2.x; x_dir < 0 ? w.end_x < x : x < w.end_x; x += x_dir) {
+            sq = grid[bend2.y][x] + 1;
             cost += sq * sq;
         }
     }
 
-    sq = grid[end.y][end.x];
+    sq = grid[w.end_y][w.end_x] + 1;
     cost += sq * sq;
     return cost;
 }
 
-//Route Wires per wire parallelism
-void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int t) {
+//Route Wires sequentially
+void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int t, int it) {
     for(size_t i = 0; i < w.size(); i++) {
-        /*
-        if (w[i].start_x == w[i].bend1_x && w[i].start_y == w[i].bend1_y) {
-            if (w[i].start_x == w[i].end_x || w[i].start_y == w[i].end_y) {
-                w[i].bend1_x = w[i].end_x;
-                w[i].bend1_y = w[i].end_y;
-                write_wire(w[i], 1, grid);
-                continue;
-            }
-        } else {
-            write_wire(w[i], -1, grid);
-        }
-        */
         //Remove wire from grid if present
         // /*
         if (w[i].start_x != w[i].bend1_x || w[i].start_y != w[i].bend1_y) {
@@ -235,7 +172,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
         int minCost = INT_MAX;
         Wire minWire = w[i];
 
-        if (((double) random())/((double) RAND_MAX) < SA_prob) {
+        if (it > 0 && ((double) random())/((double) RAND_MAX) < SA_prob) {
             Point dirs = {w[i].end_x - w[i].start_x, w[i].end_y - w[i].start_y};
             if (((double) random())/((double) RAND_MAX) > 0.5) {
                 //Vertical
@@ -302,19 +239,81 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
         //Add new wire to grid and wires
         w[i] = minWire;
         write_wire(w[i], 1, grid);
-        
-        
-        /*
-        if (w[i].start_x == w[i].bend1_x && w[i].start_y == w[i].bend1_y) {
-            fprintf(stderr, "Overmatch! ");
-            print_wire(w[i]);
-            printf("\n");
-        } else if (w[i].start_x != w[i].bend1_x && w[i].start_y != w[i].bend1_y) {
-            fprintf(stderr, "No Match! ");
-            print_wire(w[i]);
-            printf("\n");
+    }
+}
+
+//Route Wires per wire parallelism
+void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int t, int it) {
+    for(size_t i = 0; i < w.size(); i++) {
+        //Remove wire from grid if present
+        // /*
+        if (w[i].start_x != w[i].bend1_x || w[i].start_y != w[i].bend1_y) {
+            write_wire(w[i], -1, grid);
         }
-        */
+        //*/
+
+        WireCost minCost = {get_cost(w[i], grid), w[i]};
+
+        #pragma omp declare reduction(min_cost : WireCost : omp_out = (omp_out.c < omp_in.c) ? omp_out : omp_in) initializer(omp_priv={INT_MAX, {0,0,0,0,0,0}})
+
+        if (it > 0 && (double) rand()/RAND_MAX < SA_prob) {
+            Point dirs = {w[i].end_x - w[i].start_x, w[i].end_y - w[i].start_y};
+            if ((double) rand()/RAND_MAX > 0.5) {
+                //Vertical
+                w[i].bend1_y = (int) (dirs.y * (double) rand()/ RAND_MAX);
+            } else {
+                //Horizontal
+                w[i].bend1_x = (int) (dirs.x * (double) random()/RAND_MAX);
+            }
+        } else {
+            Point dir = {(w[i].end_x - w[i].start_x > 0 ? 1 : -1), (w[i].end_y - w[i].start_y > 0 ? 1 : -1)};
+            //Check Horizontal
+            if (dir.x > 0) {
+                #pragma omp parallel for reduction(min_cost:minCost)
+                for(int x = w[i].start_x + dir.x; x <= w[i].end_x; x += dir.x) {
+                    Wire wire = w[i];
+                    wire.bend1_x = x;
+                    wire.bend1_y = w[i].start_y;
+                    WireCost cost = {get_cost(wire, grid), wire};
+                    minCost = (cost.c < minCost.c) ? cost : minCost;
+                }
+            } else {
+                #pragma omp parallel for reduction(min_cost:minCost)
+                for(int x = w[i].start_x + dir.x; w[i].end_x <= x; x += dir.x) {
+                    Wire wire = w[i];
+                    wire.bend1_x = x;
+                    wire.bend1_y = w[i].start_y;
+                    WireCost cost = {get_cost(wire, grid), wire};
+                    minCost = (cost.c < minCost.c) ? cost : minCost;
+                }
+            }
+            
+
+            //Check Vertical
+            if (dir.y > 0) {
+                #pragma omp parallel for reduction(min_cost:minCost)
+                for(int y = w[i].start_y + dir.y; y <= w[i].end_y; y += dir.y) {
+                    Wire wire = w[i];
+                    wire.bend1_x = w[i].start_x;
+                    wire.bend1_y = y;
+                    WireCost cost = {get_cost(wire, grid), wire};
+                    minCost = (cost.c < minCost.c) ? cost : minCost;
+                }
+            } else {
+                #pragma omp parallel for reduction(min_cost:minCost)
+                for(int y = w[i].start_y + dir.y; w[i].end_y <= y; y += dir.y) {
+                    Wire wire = w[i];
+                    wire.bend1_x = w[i].start_x;
+                    wire.bend1_y = y;
+                    WireCost cost = {get_cost(wire, grid), wire};
+                    minCost = (cost.c < minCost.c) ? cost : minCost;
+                }
+            }
+        }
+
+        //Add new wire to grid and wires
+        w[i] = minCost.w;
+        write_wire(w[i], 1, grid);
     }
 }
 
@@ -377,7 +376,6 @@ void write_output(const std::vector<Wire>& wires, const int num_wires, const std
 }
 
 int main(int argc, char *argv[]) {
-    srandom(0);
     const auto init_start = std::chrono::steady_clock::now();
 
     std::string input_filename;
@@ -450,6 +448,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Initialize any additional data structures needed in the algorithm */
+    omp_set_num_threads(num_threads);
 
     const double init_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - init_start).count();
     std::cout << "Initialization time (sec): " << std::fixed << std::setprecision(10) << init_time << '\n';
@@ -462,12 +461,10 @@ int main(int argc, char *argv[]) {
     * Don't use global variables.
     * Use OpenMP to parallelize the algorithm. 
     */
-    if (num_threads == 1) {
+    if (parallel_mode == 'W') {
         for (int i = 0; i < SA_iters; i++) {
-            s_route(wires, occupancy, SA_prob, {dim_x, dim_y}, num_threads);
+            w_route(wires, occupancy, SA_prob, {dim_x, dim_y}, num_threads, i);
         }
-    }else if (parallel_mode == 'W') {
-        
     } else /*parallel_mode == 'A'*/ {
       
     }

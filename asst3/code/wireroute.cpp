@@ -326,6 +326,93 @@ void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
         write_wire(w[i], 1, grid);
     }
 }
+
+//Route Wires parallel across wires
+void a_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int t, int it) {
+    #pragma omp parallel for
+    for(size_t i = 0; i < w.size(); i++) {
+        //Remove wire from grid if present
+        if (w[i].start_x == w[i].end_x || w[i].start_y == w[i].end_y) {
+            if(it == 0)
+                write_wire(w[i], 1, grid);
+            continue;
+        } else if (it > 0) {
+            write_wire(w[i], -1, grid);
+        }
+
+        int minCost = INT_MAX;
+        Wire minWire = w[i];
+
+        if (it > 0 && (double) random() / RAND_MAX < SA_prob) {
+            Point dirs = {w[i].end_x - w[i].start_x, w[i].end_y - w[i].start_y};
+            if ((double) random() / RAND_MAX < SA_prob) {
+                //Vertical
+                w[i].bend1_y = (int) (dirs.y * (double) random() / RAND_MAX) + w[i].start_y;
+            } else {
+                //Horizontal
+                w[i].bend1_x = (int) (dirs.x * (double) random() / RAND_MAX) + w[i].start_x;
+            }
+            write_wire(w[i], 1, grid);
+            continue;
+        } else {
+            Point dir = {(w[i].end_x - w[i].start_x > 0 ? 1 : -1), (w[i].end_y - w[i].start_y > 0 ? 1 : -1)};
+            int cost;
+            //Check Vertical
+            if (dir.x > 0) {
+                for(int x = w[i].start_x + dir.x; x <= w[i].end_x; x += dir.x) {
+                    Wire wire = w[i];
+                    wire.bend1_x = x;
+                    wire.bend1_y = w[i].start_y;
+                    cost = get_cost_vertical(wire, grid, dir);
+                    if (cost < minCost) {
+                        minWire = wire;
+                        minCost = cost;
+                    }
+                }
+            } else {
+                for(int x = w[i].start_x + dir.x; w[i].end_x <= x; x += dir.x) {
+                    Wire wire = w[i];
+                    wire.bend1_x = x;
+                    wire.bend1_y = w[i].start_y;
+                    cost = get_cost_vertical(wire, grid, dir);
+                    if (cost < minCost) {
+                        minWire = wire;
+                        minCost = cost;
+                    }
+                }
+            }
+
+            //Check Horizontal
+            if (dir.y > 0) {
+                for(int y = w[i].start_y + dir.y; y <= w[i].end_y; y += dir.y) {
+                    Wire wire = w[i];
+                    wire.bend1_x = w[i].start_x;
+                    wire.bend1_y = y;
+                    cost = get_cost_horizontal(wire, grid, dir);
+                    if (cost < minCost) {
+                        minWire = wire;
+                        minCost = cost;
+                    }
+                }
+            } else {
+                for(int y = w[i].start_y + dir.y; w[i].end_y <= y; y += dir.y) {
+                    Wire wire = w[i];
+                    wire.bend1_x = w[i].start_x;
+                    wire.bend1_y = y;
+                    cost = get_cost_horizontal(wire, grid, dir);
+                    if (cost < minCost) {
+                        minWire = wire;
+                        minCost = cost;
+                    }
+                }
+            }
+        }
+
+        //Add new wire to grid and wires
+        w[i] = minWire;
+        write_wire(w[i], 1, grid);
+    }
+}
  
 void write_output(const std::vector<Wire>& wires, const int num_wires, const std::vector<std::vector<int>>& occupancy, const int dim_x, const int dim_y, const int num_threads, std::string input_filename) {
     if (std::size(input_filename) >= 4 && input_filename.substr(std::size(input_filename) - 4) == ".txt") {
@@ -475,7 +562,8 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < SA_iters; i++)
             w_route(wires, occupancy, SA_prob, {dim_x, dim_y}, num_threads, i);
     } else /*parallel_mode == 'A'*/ {
-    
+        for (int i = 0; i < SA_iters; i++)
+            a_route(wires, occupancy, SA_prob, {dim_x, dim_y}, num_threads, i);
     }
 
     const double compute_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - compute_start).count();

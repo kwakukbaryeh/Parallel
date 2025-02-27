@@ -3,8 +3,8 @@
 make clean; make
 
 if [ "$1" == "t" ]; then 
-    ./wireroute -f inputs/testinput/circuit_32x32_8.txt -n $2 -m W
-    ./wireroute -f inputs/timeinput/easy_4096.txt -n $2 -m W
+    ./wireroute -f inputs/testinput/circuit_32x32_8.txt -n $2 -m A
+    ./wireroute -f inputs/timeinput/easy_4096.txt -n $2 -m A
 else
     for i in {1,2,4,8}
     do

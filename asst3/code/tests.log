@@ -1,0 +1,166 @@
+/bin/rm -rf *~ *.o wireroute *.class
+/bin/rm inputs/testinput/*_occupancy_*.txt
+g++ -Wall -O3 -std=c++17 -m64 -I. -fopenmp -Wno-unknown-pragmas -c wireroute.cpp
+g++ -Wall -O3 -std=c++17 -m64 -I. -fopenmp -Wno-unknown-pragmas   -c -o validate.o validate.cpp
+g++ -Wall -O3 -std=c++17 -m64 -I. -fopenmp -Wno-unknown-pragmas -o wireroute wireroute.o validate.o
+Number of threads: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0156827120
+Computation time (sec): 0.5069177030
+Max occupancy: 2
+Total cost: 120355
+/bin/rm -rf *~ *.o wireroute *.class
+/bin/rm inputs/testinput/*_occupancy_*.txt
+g++ -Wall -O3 -std=c++17 -m64 -I. -fopenmp -Wno-unknown-pragmas -c wireroute.cpp
+g++ -Wall -O3 -std=c++17 -m64 -I. -fopenmp -Wno-unknown-pragmas   -c -o validate.o validate.cpp
+g++ -Wall -O3 -std=c++17 -m64 -I. -fopenmp -Wno-unknown-pragmas -o wireroute wireroute.o validate.o
+Number of threads: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0216958990
+Computation time (sec): 0.5437875330
+Max occupancy: 2
+Total cost: 120355
+make: Nothing to be done for 'all'.
+Number of threads: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0743613870
+Computation time (sec): 0.5299156560
+Max occupancy: 2
+Total cost: 120355
+/bin/rm -rf *~ *.o wireroute *.class
+/bin/rm inputs/testinput/*_occupancy_*.txt
+g++ -Wall -O3 -std=c++17 -m64 -I. -fopenmp -Wno-unknown-pragmas -c wireroute.cpp
+g++ -Wall -O3 -std=c++17 -m64 -I. -fopenmp -Wno-unknown-pragmas   -c -o validate.o validate.cpp
+g++ -Wall -O3 -std=c++17 -m64 -I. -fopenmp -Wno-unknown-pragmas -o wireroute wireroute.o validate.o
+Number of threads: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0156081660
+Computation time (sec): 0.5066478370
+Max occupancy: 2
+Total cost: 120355
+Number of threads: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/medium_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0157749980
+Computation time (sec): 8.9103121830
+Max occupancy: 3
+Total cost: 591686
+Number of threads: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0217646210
+Computation time (sec): 9.9960082140
+Max occupancy: 3
+Total cost: 1023890
+Number of threads: 2
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0162945610
+Computation time (sec): 0.3171846820
+Max occupancy: 2
+Total cost: 119902
+Number of threads: 2
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/medium_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0153850480
+Computation time (sec): 4.6173399910
+Max occupancy: 3
+Total cost: 589890
+Number of threads: 2
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0152802350
+Computation time (sec): 5.0404822070
+Max occupancy: 3
+Total cost: 1023403
+Number of threads: 4
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0151332490
+Computation time (sec): 0.1777876570
+Max occupancy: 2
+Total cost: 119901
+Number of threads: 4
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/medium_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0153722170
+Computation time (sec): 2.4353757760
+Max occupancy: 3
+Total cost: 588693
+Number of threads: 4
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0156291140
+Computation time (sec): 2.7474361880
+Max occupancy: 3
+Total cost: 1019631
+Number of threads: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0152727880
+Computation time (sec): 0.0640188870
+Max occupancy: 2
+Total cost: 120531
+Number of threads: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/medium_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0153356540
+Computation time (sec): 1.2454525290
+Max occupancy: 3
+Total cost: 589686
+Number of threads: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0156191100
+Computation time (sec): 1.4219561470
+Max occupancy: 3
+Total cost: 1020157

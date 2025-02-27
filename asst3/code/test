@@ -2,7 +2,7 @@
 
 make clean; make
 
-if [ "$1" == "t" ]; then 
+if [ "$1" == "-t" ]; then 
     ./wireroute -f inputs/testinput/circuit_32x32_8.txt -n $2 -m A
     ./wireroute -f inputs/testinput/circuit_32x32_8.txt -n $2 -m W
     ./wireroute -f inputs/timeinput/easy_4096.txt -n $2 -m A
@@ -10,9 +10,9 @@ if [ "$1" == "t" ]; then
 else
     for i in {1,2,4,8}
     do
-        ./wireroute -f inputs/timeinput/easy_4096.txt -n $i -m W
-        ./wireroute -f inputs/timeinput/medium_4096.txt -n $i -m W
-        ./wireroute -f inputs/timeinput/hard_4096.txt -n $i -m W
+        ./wireroute -f inputs/timeinput/easy_4096.txt -n $i -m A
+        ./wireroute -f inputs/timeinput/medium_4096.txt -n $i -m A
+        ./wireroute -f inputs/timeinput/hard_4096.txt -n $i -m A
         ./wireroute -f inputs/timeinput/easy_4096.txt -n $i -m A
         ./wireroute -f inputs/timeinput/medium_4096.txt -n $i -m A
         ./wireroute -f inputs/timeinput/hard_4096.txt -n $i -m A

@@ -123,27 +123,28 @@
      int y_dir = (start.y - end.y > 0) ? -1 : 1;
  
      if (start.x == bend1.x) {
-         for (int y = start.y; (y_dir < 0 ? y > bend1.y : y < bend1.y); y += y_dir)
-             grid[y][start.x] += v;
-     } else {
-         for (int x = start.x; (x_dir < 0 ? x > bend1.x : x < bend1.x); x += x_dir)
-             grid[start.y][x] += v;
-     }
-     if (bend1.x == bend2.x) {
-         for (int y = bend1.y; (y_dir < 0 ? y > bend2.y : y < bend2.y); y += y_dir)
-             grid[y][bend1.x] += v;
-     } else {
-         for (int x = bend1.x; (x_dir < 0 ? x > bend2.x : x < bend2.x); x += x_dir)
-             grid[bend1.y][x] += v;
-     }
-     if (bend2.x == end.x) {
-         for (int y = bend2.y; (y_dir < 0 ? y > end.y : y < end.y); y += y_dir)
-             grid[y][bend2.x] += v;
-     } else {
-         for (int x = bend2.x; (x_dir < 0 ? x > end.x : x < end.x); x += x_dir)
-             grid[bend2.y][x] += v;
-     }
-     grid[end.y][end.x] += v;
+        for (int y = start.y; (y_dir < 0 ? y >= bend1.y : y <= bend1.y); y += y_dir)
+            grid[y][start.x] += v;
+    } else {
+        for (int x = start.x; (x_dir < 0 ? x >= bend1.x : x <= bend1.x); x += x_dir)
+            grid[start.y][x] += v;
+    }
+    
+    if (bend1.x == bend2.x) {
+        for (int y = bend1.y; (y_dir < 0 ? y >= bend2.y : y <= bend2.y); y += y_dir)
+            grid[y][bend1.x] += v;
+    } else {
+        for (int x = bend1.x; (x_dir < 0 ? x >= bend2.x : x <= bend2.x); x += x_dir)
+            grid[bend1.y][x] += v;
+    }
+    
+    if (bend2.x == end.x) {
+        for (int y = bend2.y; (y_dir < 0 ? y >= end.y : y <= end.y); y += y_dir)
+            grid[y][bend2.x] += v;
+    } else {
+        for (int x = bend2.x; (x_dir < 0 ? x >= end.x : x <= end.x); x += x_dir)
+            grid[bend2.y][x] += v;
+    }
  }
  
  //Get the cost of a wire route

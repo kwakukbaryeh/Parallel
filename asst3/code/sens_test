@@ -1,0 +1,18 @@
+# !/bin/bash
+
+for i in 0.01, 0.1, 0.5
+do
+    ./wireroute -f inputs/timeinput/easy_4096.txt -n 1 -m A -p $i
+    ./wireroute -f inputs/timeinput/medium_4096.txt -n 1 -m A -p $i
+    ./wireroute -f inputs/timeinput/hard_4096.txt -n 1 -m A -p $i
+done
+
+#Varied Size
+./wireroute -f inputs/problemsize/gridsize/hard_2048.txt -n 1 -m A
+./wireroute -f inputs/problemsize/gridsize/hard_4096.txt -n 1 -m A
+./wireroute -f inputs/problemsize/gridsize/hard_8192.txt -n 1 -m A
+
+# Varied Wires
+./wireroute -f inputs/problemsize/numwires/hard_4096_539.txt -n 1 -m A
+./wireroute -f inputs/problemsize/numwires/hard_4096_1123.txt -n 1 -m A
+./wireroute -f inputs/problemsize/numwires/hard_4096_1581.txt -n 1 -m A

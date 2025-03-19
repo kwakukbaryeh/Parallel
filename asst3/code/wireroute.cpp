@@ -21,9 +21,9 @@
 #define GRID_SIZE 128
  
 // Point Data Structure
- struct Point {
+struct Point {
      int x,y;
- };
+};
 
 // Wire cost Structure
 struct WireCost {

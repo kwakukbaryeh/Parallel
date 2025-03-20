@@ -16,12 +16,23 @@ struct Point {
     int x,y;
 };
 
+struct IndexedWire {
+    size_t i;
+    Wire w;
+};
+
 void print_point(Point p) {
     printf("(%d,%d)", p.x, p.y);
 }
  
 void print_wire(Wire wire) {
     printf("((%d,%d),(%d,%d),(%d,%d))", wire.start_x, wire.start_y, wire.bend1_x, wire.bend1_y, wire.end_x, wire.end_y);
+}
+
+void print_indexedWire(IndexedWire iw) {
+    printf("(%zu, ", iw.i);
+    print_wire(iw.w);
+    printf(")");
 }
 
 //Write the wire to the occupancy matrix
@@ -139,7 +150,7 @@ static int get_cost_vertical(Wire w, std::vector<std::vector<int>>& grid, Point 
 //Route Wires sequentially
 void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int it, int pid, int nproc, int batch_size) {
     int count = 0;
-    Wire computed_wires[batch_size];
+    IndexedWire computed_wires[batch_size];
     for(size_t i = pid; i < w.size(); i+= nproc) {
         //Remove wire from grid if present
         if (w[i].start_x == w[i].end_x || w[i].start_y == w[i].end_y) {
@@ -220,28 +231,42 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
 
         //Add new wire to grid and wires
         w[i] = minWire;
-        computed_wires[count] = minWire;
+        computed_wires[count] = {i, minWire};
         write_wire(w[i], 1, grid);
 
         count++;
         // Synchronize across threads
-        if (count % batch_size == 0) {
-            MPI_Allgather(&computed_wires, sizeof(Wire) * batch_size, MPI_BYTE, w.data(), sizeof(Wire) * batch_size, MPI_BYTE, MPI_COMM_WORLD);
-            //Zero the occupancy matrix (maybe bugged)
-            grid.resize(dim.y, std::vector<int>(dim.x, 0));
+        if (count == batch_size) {
+            std::vector<IndexedWire> updates(batch_size * nproc);
+            MPI_Allgather(&computed_wires, sizeof(IndexedWire) * batch_size, MPI_BYTE, updates.data(), sizeof(IndexedWire) * batch_size, MPI_BYTE, MPI_COMM_WORLD);
+            //Apply the updates
+            for (const auto& update : updates) {
+                if (it == 0 && update.i % nproc != pid){}
+                else
+                    write_wire(w[update.i], -1, grid);
+                w[update.i] = update.w;
+                write_wire(update.w, 1, grid);
+            }
 
-            //Reconstruct the new occupancy matrix state (maybe bugged)
-            for (const auto& wire : w)
-                write_wire(wire, 1, grid);
             count = 0;
         }
     }
+
+    while (count < batch_size)
+        computed_wires[count++] = {pid, {-1,-1,-1,-1,-1,-1}};
+
     // Synchronize across threads
-    if (count < batch_size == 0) {
-        MPI_Allgather(&computed_wires, sizeof(Wire) * batch_size, MPI_BYTE, w.data(), sizeof(Wire) * batch_size, MPI_BYTE, MPI_COMM_WORLD);
-        grid.resize(dim.y, std::vector<int>(dim.x, 0));
-        for (const auto& wire : w)
-            write_wire(wire, 1, grid);
+    std::vector<IndexedWire> updates(batch_size * nproc);
+    MPI_Allgather(&computed_wires, sizeof(IndexedWire) * batch_size, MPI_BYTE, updates.data(), sizeof(IndexedWire) * batch_size, MPI_BYTE, MPI_COMM_WORLD);
+    //Apply the updates
+    for (const auto& update : updates) {
+        if (update.w.start_x != -1) {
+            if (it == 0 && update.i % nproc != pid){}
+                    else
+                        write_wire(w[update.i], -1, grid);
+            w[update.i] = update.w;
+            write_wire(update.w, 1, grid);
+        }
     }
 }
 

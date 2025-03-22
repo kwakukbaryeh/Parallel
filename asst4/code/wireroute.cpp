@@ -36,7 +36,7 @@ void print_indexedWire(IndexedWire iw) {
 }
 
 //Write the wire to the occupancy matrix
-static inline void write_wire(Wire w, int v, std::vector<std::vector<int>>& grid) {
+static inline void write_wire(Wire w, int v, std::vector<int>& grid, int dim_x) {
     Point start = {w.start_x, w.start_y};
     Point bend1 = {w.bend1_x, w.bend1_y};
     Point bend2;
@@ -56,29 +56,28 @@ static inline void write_wire(Wire w, int v, std::vector<std::vector<int>>& grid
 
     if (start.x == bend1.x) { 
         for (int y = start.y; y_dir < 0 ? bend1.y < y : y < bend1.y; y += y_dir)
-            grid[y][start.x] += v;
-
+            grid[y * dim_x + start.x] += v;
         for (int x = bend1.x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir)
-            grid[bend1.y][x] += v;
+            grid[bend1.y * dim_x + x] += v;
 
         for (int y = bend2.y; y_dir < 0 ? end.y < y : y < end.y; y += y_dir)
-            grid[y][bend2.x] += v;
+            grid[y * dim_x + bend2.x] += v;
     } else { 
         for (int x = start.x; x_dir < 0 ? bend1.x < x : x < bend1.x; x += x_dir)
-            grid[start.y][x] += v;
+            grid[start.y * dim_x + x] += v;
 
         for (int y = bend1.y; y_dir < 0 ? bend2.y < y : y < bend2.y; y += y_dir)
-            grid[y][bend1.x] += v;
+            grid[y * dim_x + bend1.x] += v;
 
         for (int x = bend2.x; x_dir < 0 ? end.x < x : x < end.x; x += x_dir)
-            grid[bend2.y][x] += v;
+            grid[bend2.y * dim_x + x] += v;
     }
 
-    grid[end.y][end.x] += v;
+    grid[end.y * dim_x + end.x] += v;
 }
 
 //Get the cost of a horizontal wire route
-static int get_cost_horizontal(Wire w, std::vector<std::vector<int>>& grid, Point dir) {
+static int get_cost_horizontal(Wire w, const std::vector<int>& grid, Point dir, int dim_x) {
     Point bend2;
 
     if (w.start_x == w.bend1_x) {
@@ -93,27 +92,27 @@ static int get_cost_horizontal(Wire w, std::vector<std::vector<int>>& grid, Poin
     int sq;
 
     for (int y = w.start_y; dir.y < 0 ? w.bend1_y < y : y < w.bend1_y; y += dir.y){
-        sq = grid[y][w.start_x] + 1;
+        sq = grid[y * dim_x + w.start_x] + 1;
         cost += sq * sq;
     }
 
     for (int x = w.bend1_x; dir.x < 0 ? bend2.x < x : x < bend2.x; x += dir.x) {
-        sq = grid[w.bend1_y][x] + 1;
+        sq = grid[w.bend1_y * dim_x + x] + 1;
         cost += sq * sq;
     }
 
     for (int y = bend2.y; dir.y < 0 ? w.end_y < y : y < w.end_y; y += dir.y) {
-        sq = grid[y][bend2.x] + 1;
+        sq = grid[y * dim_x + bend2.x] + 1;
         cost += sq * sq;
     }
 
-    sq = grid[w.end_y][w.end_x] + 1;
+    sq = grid[w.end_y * dim_x + w.end_x] + 1;
     cost += sq * sq;
     return cost;
 }
 
 //Get the cost of a vertical wire route
-static int get_cost_vertical(Wire w, std::vector<std::vector<int>>& grid, Point dir) {
+static int get_cost_vertical(Wire w, const std::vector<int>& grid, Point dir, int dim_x) {
     Point bend2;
 
     if (w.start_x == w.bend1_x) {
@@ -128,37 +127,37 @@ static int get_cost_vertical(Wire w, std::vector<std::vector<int>>& grid, Point 
     int sq;
 
     for (int x = w.start_x; dir.x < 0 ? w.bend1_x < x : x < w.bend1_x; x += dir.x) {
-        sq = grid[w.start_y][x] + 1;
+        sq = grid[w.start_y * dim_x + x] + 1;
         cost += sq * sq;
     }
 
     for (int y = w.bend1_y; dir.y < 0 ? bend2.y < y : y < bend2.y; y += dir.y) {
-        sq = grid[y][w.bend1_x] + 1;
+        sq = grid[y * dim_x + w.bend1_x] + 1;
         cost += sq * sq;
     }
 
     for (int x = bend2.x; dir.x < 0 ? w.end_x < x : x < w.end_x; x += dir.x) {
-        sq = grid[bend2.y][x] + 1;
+        sq = grid[bend2.y * dim_x + x] + 1;
         cost += sq * sq;
     }
 
-    sq = grid[w.end_y][w.end_x] + 1;
+    sq = grid[w.end_y * dim_x + w.end_x] + 1;
     cost += sq * sq;
     return cost;
 }
 
 //Route Wires sequentially
-void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int it, int pid, int nproc, int batch_size) {
+void s_route(std::vector<Wire> &w, std::vector<int> &grid, int dim_x, double SA_prob, Point dim, int it, int pid, int nproc, int batch_size) {
     int count = 0;
     IndexedWire computed_wires[batch_size];
     for(size_t i = pid; i < w.size(); i+= nproc) {
         //Remove wire from grid if present
         if (w[i].start_x == w[i].end_x || w[i].start_y == w[i].end_y) {
             if(it == 0)
-                write_wire(w[i], 1, grid);
+                write_wire(w[i], 1, grid, dim_x);
             continue;
         } else if (it > 0) {
-            write_wire(w[i], -1, grid);
+            write_wire(w[i], -1, grid, dim_x);
         }
 
         int minCost = INT_MAX;
@@ -173,7 +172,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
                 //Horizontal
                 w[i].bend1_x = (int) (dirs.x * (double) random() / RAND_MAX) + w[i].start_x;
             }
-            write_wire(w[i], 1, grid);
+            write_wire(w[i], 1, grid, dim_x);
             continue;
         } else {
             Point dir = {(w[i].end_x - w[i].start_x > 0 ? 1 : -1), (w[i].end_y - w[i].start_y > 0 ? 1 : -1)};
@@ -184,7 +183,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
                     Wire wire = w[i];
                     wire.bend1_x = x;
                     wire.bend1_y = w[i].start_y;
-                    cost = get_cost_vertical(wire, grid, dir);
+                    cost = get_cost_vertical(wire, grid, dir, dim_x);
                     if (cost < minCost) {
                         minWire = wire;
                         minCost = cost;
@@ -195,7 +194,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
                     Wire wire = w[i];
                     wire.bend1_x = x;
                     wire.bend1_y = w[i].start_y;
-                    cost = get_cost_vertical(wire, grid, dir);
+                    cost = get_cost_vertical(wire, grid, dir, dim_x);
                     if (cost < minCost) {
                         minWire = wire;
                         minCost = cost;
@@ -209,7 +208,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
                     Wire wire = w[i];
                     wire.bend1_x = w[i].start_x;
                     wire.bend1_y = y;
-                    cost = get_cost_horizontal(wire, grid, dir);
+                    cost = get_cost_horizontal(wire, grid, dir, dim_x);
                     if (cost < minCost) {
                         minWire = wire;
                         minCost = cost;
@@ -220,7 +219,7 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
                     Wire wire = w[i];
                     wire.bend1_x = w[i].start_x;
                     wire.bend1_y = y;
-                    cost = get_cost_horizontal(wire, grid, dir);
+                    cost = get_cost_horizontal(wire, grid, dir, dim_x);
                     if (cost < minCost) {
                         minWire = wire;
                         minCost = cost;
@@ -232,50 +231,50 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
         //Add new wire to grid and wires
         w[i] = minWire;
         computed_wires[count] = {i, minWire};
-        write_wire(w[i], 1, grid);
+        write_wire(w[i], 1, grid, dim_x);
 
         count++;
         // Synchronize across threads
-        if (count == batch_size) {
+        if (count == batch_size && i - pid + nproc < w.size()) {
             std::vector<IndexedWire> updates(batch_size * nproc);
             MPI_Allgather(&computed_wires, sizeof(IndexedWire) * batch_size, MPI_BYTE, updates.data(), sizeof(IndexedWire) * batch_size, MPI_BYTE, MPI_COMM_WORLD);
             //Apply the updates
             for (const auto& update : updates) {
                 if (it == 0 && update.i % nproc != pid){}
                 else
-                    write_wire(w[update.i], -1, grid);
+                    write_wire(w[update.i], -1, grid, dim_x);
                 w[update.i] = update.w;
-                write_wire(update.w, 1, grid);
+                write_wire(update.w, 1, grid, dim_x);
             }
-
             count = 0;
         }
     }
+    for (; count < batch_size; ++count)
+        computed_wires[count] = {static_cast<size_t>(pid), {-1,-1,-1,-1,-1,-1}};
 
-    while (count < batch_size)
-        computed_wires[count++] = {pid, {-1,-1,-1,-1,-1,-1}};
-
-    // Synchronize across threads
+    // Final sync across all threads
     std::vector<IndexedWire> updates(batch_size * nproc);
-    MPI_Allgather(&computed_wires, sizeof(IndexedWire) * batch_size, MPI_BYTE, updates.data(), sizeof(IndexedWire) * batch_size, MPI_BYTE, MPI_COMM_WORLD);
+    MPI_Allgather(&computed_wires, sizeof(IndexedWire) * batch_size, MPI_BYTE,
+                updates.data(), sizeof(IndexedWire) * batch_size, MPI_BYTE, MPI_COMM_WORLD);
     //Apply the updates
     for (const auto& update : updates) {
         if (update.w.start_x != -1) {
             if (it == 0 && update.i % nproc != pid){}
                     else
-                        write_wire(w[update.i], -1, grid);
+                        write_wire(w[update.i], -1, grid, dim_x);
             w[update.i] = update.w;
-            write_wire(update.w, 1, grid);
+            write_wire(update.w, 1, grid, dim_x);
         }
     }
 }
 
-void print_stats(const std::vector<std::vector<int>>& occupancy) {
+void print_stats(const std::vector<int>& occupancy, int dim_x, int dim_y) {
     int max_occupancy = 0;
     long long total_cost = 0;
 
-    for (const auto& row : occupancy) {
-        for (const int count : row) {
+    for (int y = 0; y < dim_y; ++y) {
+        for (int x = 0; x < dim_x; ++x) {
+            int count = occupancy[y * dim_x + x];
             max_occupancy = std::max(max_occupancy, count);
             total_cost += count * count;
         }
@@ -285,7 +284,7 @@ void print_stats(const std::vector<std::vector<int>>& occupancy) {
     std::cout << "Total cost: " << total_cost << '\n';
 }
 
-void write_output(const std::vector<Wire>& wires, const int num_wires, const std::vector<std::vector<int>>& occupancy, const int dim_x, const int dim_y, const int nproc, std::string input_filename) {
+void write_output(const std::vector<Wire>& wires, const int num_wires, const std::vector<int>& occupancy, int dim_x, int dim_y, const int nproc, std::string input_filename) {
     if (std::size(input_filename) >= 4 && input_filename.substr(std::size(input_filename) - 4) == ".txt") {
         input_filename.resize(std::size(input_filename) - 4);
     }
@@ -300,9 +299,10 @@ void write_output(const std::vector<Wire>& wires, const int num_wires, const std
     }
 
     out_occupancy << dim_x << ' ' << dim_y << '\n';
-    for (const auto& row : occupancy) {
-        for (const int count : row)
-            out_occupancy << count << ' ';
+    for (int y = 0; y < dim_y; ++y) {
+        for (int x = 0; x < dim_x; ++x) {
+            out_occupancy << occupancy[y * dim_x + x] << ' ';
+        }
         out_occupancy << '\n';
     }
 
@@ -340,21 +340,17 @@ void write_output(const std::vector<Wire>& wires, const int num_wires, const std
 
 int main(int argc, char *argv[]) {
     const auto init_start = std::chrono::steady_clock::now();
-    int pid;
-    int nproc;
-
-    // Initialize MPI
-    MPI_Init(&argc, &argv);
-    // Get process rank
-    MPI_Comm_rank(MPI_COMM_WORLD, &pid);
-    // Get total number of processes  
-    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
-
-    std::string input_filename;
+    int pid, nproc;
     double SA_prob = 0.1;
     int SA_iters = 5;
     char parallel_mode = '\0';
     int batch_size = 1;
+    std::string input_filename;
+
+    // Initialize MPI
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &pid);
+    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
     // Read command line arguments
     int opt;
@@ -377,54 +373,51 @@ int main(int argc, char *argv[]) {
                 break;
             default:
                 if (pid == 0)
-                    std::cerr << "Usage: " << argv[0] << " -f input_filename [-p SA_prob] [-i SA_iters] -m parallel_mode -b batch_size\n";
+                    std::cerr << "Usage: " << argv[0] 
+                              << " -f input_filename [-p SA_prob] [-i SA_iters] -m parallel_mode -b batch_size\n";
                 MPI_Finalize();
                 exit(EXIT_FAILURE);
         }
     }
 
-    // Check if required options are provided
-    if (empty(input_filename) || SA_iters <= 0 || (parallel_mode != 'A' && parallel_mode != 'W') || batch_size <= 0) {
+    if (input_filename.empty() || SA_iters <= 0 || 
+        (parallel_mode != 'A' && parallel_mode != 'W') || batch_size <= 0) {
         if (pid == 0)
-            std::cerr << "Usage: " << argv[0] << " -f input_filename [-p SA_prob] [-i SA_iters] -m parallel_mode -b batch_size\n";
+            std::cerr << "Usage: " << argv[0] 
+                      << " -f input_filename [-p SA_prob] [-i SA_iters] -m parallel_mode -b batch_size\n";
         MPI_Finalize();
         exit(EXIT_FAILURE);
     }
 
     if (pid == 0) {
-        std::cout << "Number of processes: " << nproc << '\n';
-        std::cout << "Simulated annealing probability parameter: " << SA_prob << '\n';
-        std::cout << "Simulated annealing iterations: " << SA_iters << '\n';
-        std::cout << "Input file: " << input_filename << '\n';
-        std::cout << "Parallel mode: " << parallel_mode << '\n';
-        std::cout << "Batch size: " << batch_size << '\n';
+        std::cout << "Number of processes: " << nproc << "\n"
+                  << "Simulated annealing probability parameter: " << SA_prob << "\n"
+                  << "Simulated annealing iterations: " << SA_iters << "\n"
+                  << "Input file: " << input_filename << "\n"
+                  << "Parallel mode: " << parallel_mode << "\n"
+                  << "Batch size: " << batch_size << "\n";
     }
 
     int dim_x, dim_y, num_wires;
     std::vector<Wire> wires;
-    std::vector<std::vector<int>> occupancy;
-    
 
+    // Only process 0 reads the input file.
     if (pid == 0) {
         std::ifstream fin(input_filename);
-
         if (!fin) {
             std::cerr << "Unable to open file: " << input_filename << ".\n";
             exit(EXIT_FAILURE);
         }
-
-        /* Read the grid dimension and wire information from file */
         fin >> dim_x >> dim_y >> num_wires;
-
         wires.resize(num_wires);
-        for (auto& wire : wires) {
+        for (auto &wire : wires) {
             fin >> wire.start_x >> wire.start_y >> wire.end_x >> wire.end_y;
             wire.bend1_x = wire.start_x;
             wire.bend1_y = wire.start_y;
         }
     }
 
-    /* Initialize any additional data structures needed in the algorithm */
+    // Broadcast dimensions and wire information to all processes.
     MPI_Bcast(&dim_x, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&dim_y, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&num_wires, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -432,32 +425,36 @@ int main(int argc, char *argv[]) {
         wires.resize(num_wires);
     MPI_Bcast(wires.data(), num_wires * sizeof(Wire), MPI_BYTE, 0, MPI_COMM_WORLD);
 
-    occupancy.resize(dim_y, std::vector<int>(dim_x, 0));
+    // Create the 1D occupancy grid.
+    std::vector<int> occupancy(dim_x * dim_y, 0);
 
     if (pid == 0) {
-        const double init_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - init_start).count();
-        std::cout << "Initialization time (sec): " << std::fixed << std::setprecision(10) << init_time << '\n';
+        const double init_time = std::chrono::duration_cast<std::chrono::duration<double>>(
+                                     std::chrono::steady_clock::now() - init_start).count();
+        std::cout << "Initialization time (sec): " 
+                  << std::fixed << std::setprecision(10) << init_time << "\n";
     }
 
     const auto compute_start = std::chrono::steady_clock::now();
-
     for (int i = 0; i < SA_iters; i++)
-        s_route(wires, occupancy, SA_prob, {dim_x, dim_y}, i, pid, nproc, batch_size);
+        s_route(wires, occupancy, dim_x, SA_prob, Point{dim_x, dim_y}, i, pid, nproc, batch_size);
 
     if (pid == 0) {
-        const double compute_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - compute_start).count();
-        std::cout << "Computation time (sec): " << std::fixed << std::setprecision(10) << compute_time << '\n';
+        const double compute_time = std::chrono::duration_cast<std::chrono::duration<double>>(
+                                        std::chrono::steady_clock::now() - compute_start).count();
+        std::cout << "Computation time (sec): " 
+                  << std::fixed << std::setprecision(10) << compute_time << "\n";
     }
 
     if (pid == 0) {
-        /* Write wires and occupancy matrix to files */
-        print_stats(occupancy);
+        print_stats(occupancy, dim_x, dim_y);
         write_output(wires, num_wires, occupancy, dim_x, dim_y, nproc, input_filename);
     }
 
-    // Cleanup
     MPI_Finalize();
+    return 0;
 }
+
 
 validate_wire_t Wire::to_validate_format(void) const {
     /* TODO(student): Implement this if you want to use the wr_checker. */

@@ -344,22 +344,17 @@ void write_output(const std::vector<Wire>& wires, const int num_wires, const std
 
 int main(int argc, char *argv[]) {
     const auto init_start = std::chrono::steady_clock::now();
-    int pid;
-    int nproc;
-    double local_start, local_end, local_compute_time, global_compute_time;
-
-    // Initialize MPI
-    MPI_Init(&argc, &argv);
-    // Get process rank
-    MPI_Comm_rank(MPI_COMM_WORLD, &pid);
-    // Get total number of processes  
-    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
-
-    std::string input_filename;
+    int pid, nproc;
     double SA_prob = 0.1;
     int SA_iters = 5;
     char parallel_mode = '\0';
     int batch_size = 1;
+    std::string input_filename;
+
+    // Initialize MPI
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &pid);
+    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
     // Read command line arguments
     int opt;
@@ -382,101 +377,88 @@ int main(int argc, char *argv[]) {
                 break;
             default:
                 if (pid == 0)
-                    std::cerr << "Usage: " << argv[0] << " -f input_filename [-p SA_prob] [-i SA_iters] -m parallel_mode -b batch_size\n";
+                    std::cerr << "Usage: " << argv[0] 
+                              << " -f input_filename [-p SA_prob] [-i SA_iters] -m parallel_mode -b batch_size\n";
                 MPI_Finalize();
                 exit(EXIT_FAILURE);
         }
     }
 
-    // Check if required options are provided
-    if (empty(input_filename) || SA_iters <= 0 || (parallel_mode != 'A' && parallel_mode != 'W') || batch_size <= 0) {
+    if (input_filename.empty() || SA_iters <= 0 || 
+        (parallel_mode != 'A' && parallel_mode != 'W') || batch_size <= 0) {
         if (pid == 0)
-            std::cerr << "Usage: " << argv[0] << " -f input_filename [-p SA_prob] [-i SA_iters] -m parallel_mode -b batch_size\n";
+            std::cerr << "Usage: " << argv[0] 
+                      << " -f input_filename [-p SA_prob] [-i SA_iters] -m parallel_mode -b batch_size\n";
         MPI_Finalize();
         exit(EXIT_FAILURE);
     }
 
     if (pid == 0) {
-        std::cout << "Number of processes: " << nproc << '\n';
-        std::cout << "Simulated annealing probability parameter: " << SA_prob << '\n';
-        std::cout << "Simulated annealing iterations: " << SA_iters << '\n';
-        std::cout << "Input file: " << input_filename << '\n';
-        std::cout << "Parallel mode: " << parallel_mode << '\n';
-        std::cout << "Batch size: " << batch_size << '\n';
+        std::cout << "Number of processes: " << nproc << "\n"
+                  << "Simulated annealing probability parameter: " << SA_prob << "\n"
+                  << "Simulated annealing iterations: " << SA_iters << "\n"
+                  << "Input file: " << input_filename << "\n"
+                  << "Parallel mode: " << parallel_mode << "\n"
+                  << "Batch size: " << batch_size << "\n";
     }
 
     int dim_x, dim_y, num_wires;
     std::vector<Wire> wires;
-    
 
+    // Only process 0 reads the input file.
     if (pid == 0) {
         std::ifstream fin(input_filename);
-
         if (!fin) {
             std::cerr << "Unable to open file: " << input_filename << ".\n";
             exit(EXIT_FAILURE);
         }
-
-        /* Read the grid dimension and wire information from file */
         fin >> dim_x >> dim_y >> num_wires;
-
         wires.resize(num_wires);
-        for (auto& wire : wires) {
+        for (auto &wire : wires) {
             fin >> wire.start_x >> wire.start_y >> wire.end_x >> wire.end_y;
             wire.bend1_x = wire.start_x;
             wire.bend1_y = wire.start_y;
         }
     }
 
-    /* Initialize any additional data structures needed in the algorithm */
+    // Broadcast dimensions and wire information to all processes.
     MPI_Bcast(&dim_x, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&dim_y, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&num_wires, 1, MPI_INT, 0, MPI_COMM_WORLD);
     if (pid != 0)
         wires.resize(num_wires);
-    int wires_per_proc = num_wires / nproc;
-    std::vector<Wire> local_wires(wires_per_proc);
-    MPI_Scatter(wires.data(), wires_per_proc * sizeof(Wire), MPI_BYTE,
-                local_wires.data(), wires_per_proc * sizeof(Wire), MPI_BYTE,
-                0, MPI_COMM_WORLD);
-        
+    MPI_Bcast(wires.data(), num_wires * sizeof(Wire), MPI_BYTE, 0, MPI_COMM_WORLD);
 
+    // Create the 1D occupancy grid.
     std::vector<int> occupancy(dim_x * dim_y, 0);
 
-
     if (pid == 0) {
-        const double init_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - init_start).count();
-        std::cout << "Initialization time (sec): " << std::fixed << std::setprecision(10) << init_time << '\n';
+        const double init_time = std::chrono::duration_cast<std::chrono::duration<double>>(
+                                     std::chrono::steady_clock::now() - init_start).count();
+        std::cout << "Initialization time (sec): " 
+                  << std::fixed << std::setprecision(10) << init_time << "\n";
     }
 
     const auto compute_start = std::chrono::steady_clock::now();
-    
-    local_start = MPI_Wtime();
     for (int i = 0; i < SA_iters; i++)
         s_route(wires, occupancy, dim_x, SA_prob, Point{dim_x, dim_y}, i, pid, nproc, batch_size);
 
-
-    local_end = MPI_Wtime();  
-    local_compute_time = local_end - local_start;
-
-    MPI_Reduce(&local_compute_time, &global_compute_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-
-    if (pid == 0)
-        std::cout << "Max computation time across all processes: " << global_compute_time << " seconds.\n";
     if (pid == 0) {
-        const double compute_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - compute_start).count();
-        std::cout << "Computation time (sec): " << std::fixed << std::setprecision(10) << compute_time << '\n';
+        const double compute_time = std::chrono::duration_cast<std::chrono::duration<double>>(
+                                        std::chrono::steady_clock::now() - compute_start).count();
+        std::cout << "Computation time (sec): " 
+                  << std::fixed << std::setprecision(10) << compute_time << "\n";
     }
 
     if (pid == 0) {
-        /* Write wires and occupancy matrix to files */
         print_stats(occupancy, dim_x, dim_y);
         write_output(wires, num_wires, occupancy, dim_x, dim_y, nproc, input_filename);
     }
 
-    // Cleanup
     MPI_Finalize();
+    return 0;
 }
+
 
 validate_wire_t Wire::to_validate_format(void) const {
     /* TODO(student): Implement this if you want to use the wr_checker. */

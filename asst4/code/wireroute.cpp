@@ -8,6 +8,8 @@
 #include <vector>
 #include <climits>
 
+#include <string.h>
+#include <stdlib.h>
 #include <mpi.h>
 
 #include "wireroute.h"
@@ -163,14 +165,15 @@ void s_route(std::vector<Wire> &w, std::vector<int> &grid, int dim_x, double SA_
         int minCost = INT_MAX;
         Wire minWire = w[i];
 
-        if (it > 0 && (double) random() / RAND_MAX < SA_prob) {
+        if (it > 0 && (double) rand() / RAND_MAX < SA_prob) {
             Point dirs = {w[i].end_x - w[i].start_x, w[i].end_y - w[i].start_y};
-            if ((double) random() / RAND_MAX < SA_prob) {
+            double r = (double) rand() / RAND_MAX;
+            if ((double) rand() / RAND_MAX < SA_prob) {
                 //Vertical
-                w[i].bend1_y = (int) (dirs.y * (double) random() / RAND_MAX) + w[i].start_y;
+                w[i].bend1_y = (int) (dirs.y * r) + w[i].start_y + (dirs.y < 0 ? -1 : 1);
             } else {
                 //Horizontal
-                w[i].bend1_x = (int) (dirs.x * (double) random() / RAND_MAX) + w[i].start_x;
+                w[i].bend1_x = (int) (dirs.x * r) + w[i].start_x + (dirs.x < 0 ? -1 : 1);
             }
             write_wire(w[i], 1, grid, dim_x);
             continue;
@@ -235,7 +238,35 @@ void s_route(std::vector<Wire> &w, std::vector<int> &grid, int dim_x, double SA_
 
         count++;
         // Synchronize across threads
-        if (count == batch_size && i - pid + nproc < w.size()) {
+        if (batch_size > 16 && count == batch_size && i - pid + nproc < w.size()) {
+            std::vector<IndexedWire> updates(batch_size * nproc);
+            std::vector<IndexedWire> up(batch_size * nproc);
+            memcpy(computed_wires, up.data(), sizeof(IndexedWire) * batch_size);
+            MPI_Bcast(up.data(), batch_size * nproc, MPI_BYTE, 0, MPI_COMM_WORLD);
+            MPI_Request req;
+            for(int j = 1; j < nproc; j++) {
+                MPI_Wait(&req, MPI_STATUS_IGNORE);
+                memcpy(updates.data(), up.data(), sizeof(IndexedWire) * batch_size);
+                memcpy(up.data(), computed_wires, sizeof(IndexedWire) * batch_size);
+                MPI_Ibcast(updates.data(), batch_size, MPI_BYTE, j, MPI_COMM_WORLD, &req);
+                for (const auto& update : updates) {
+                    if (it == 0 && update.i % nproc != pid){}
+                    else
+                        write_wire(w[update.i], -1, grid, dim_x);
+                    w[update.i] = update.w;
+                    write_wire(update.w, 1, grid, dim_x);
+                }
+            }
+            memcpy(updates.data(), up.data(), sizeof(IndexedWire) * batch_size);
+            for (const auto& update : updates) {
+                if (it == 0 && update.i % nproc != pid){}
+                else
+                    write_wire(w[update.i], -1, grid, dim_x);
+                w[update.i] = update.w;
+                write_wire(update.w, 1, grid, dim_x);
+            }
+            count = 0;
+        } else if (count == batch_size && i - pid + nproc < w.size()) {
             std::vector<IndexedWire> updates(batch_size * nproc);
             MPI_Allgather(&computed_wires, sizeof(IndexedWire) * batch_size, MPI_BYTE, updates.data(), sizeof(IndexedWire) * batch_size, MPI_BYTE, MPI_COMM_WORLD);
             //Apply the updates
@@ -346,6 +377,8 @@ int main(int argc, char *argv[]) {
     char parallel_mode = '\0';
     int batch_size = 1;
     std::string input_filename;
+
+    srand(31415926);
 
     // Initialize MPI
     MPI_Init(&argc, &argv);

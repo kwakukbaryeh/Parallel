@@ -1,5 +1,5 @@
 ---
-title: "Parallel Logistic Regression Project"
+title: "Parallel Logistic Regression with Stochastic Gradient Descent"
 ---
 
 ## Latest News

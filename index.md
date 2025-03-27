@@ -9,4 +9,4 @@ title: "Parallel Logistic Regression Project"
 
 ## Proposal
 You can find our detailed proposal on Overleaf here:
-[Project Proposal on Overleaf](https://www.overleaf.com/read/jrzbndwvschs#e884d0)
+[Project Proposal](https://www.overleaf.com/read/jrzbndwvschs#e884d0)

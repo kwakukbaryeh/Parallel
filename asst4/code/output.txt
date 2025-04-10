@@ -1,0 +1,141 @@
+Number of processes: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2851892150
+Computation time (sec): 8.1466977390
+Max occupancy: 17
+Total cost: 96369663
+Number of processes: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/medium_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2843502780
+Computation time (sec): 39.5255262500
+Max occupancy: 35
+Total cost: 477584490
+Number of processes: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2882221280
+Computation time (sec): 49.0432801800
+Max occupancy: 39
+Total cost: 609332687
+Number of processes: 2
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2770356110
+Computation time (sec): 4.3513813470
+Max occupancy: 19
+Total cost: 98045244
+Number of processes: 2
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/medium_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2518441260
+Computation time (sec): 20.9256090440
+Max occupancy: 38
+Total cost: 484216139
+Number of processes: 2
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2883286200
+Computation time (sec): 26.0204320590
+Max occupancy: 43
+Total cost: 617558992
+Number of processes: 4
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2491563610
+Computation time (sec): 2.4100024580
+Max occupancy: 34
+Total cost: 107910124
+Number of processes: 4
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/medium_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2632611370
+Computation time (sec): 11.9603828580
+Max occupancy: 70
+Total cost: 504724742
+Number of processes: 4
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2662579640
+Computation time (sec): 14.3011088410
+Max occupancy: 93
+Total cost: 652150307
+Number of processes: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2637647780
+Computation time (sec): 1.4166517900
+Max occupancy: 46
+Total cost: 122707948
+Number of processes: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/medium_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2584918560
+Computation time (sec): 7.9663330180
+Max occupancy: 113
+Total cost: 585394604
+Number of processes: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_1024.txt
+Parallel mode: A
+Batch size: 128
+Initialization time (sec): 0.2624157260
+Computation time (sec): 10.7973347080
+Max occupancy: 145
+Total cost: 739271252
+Number of processes: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/easy_1024.txt
+Parallel mode: A
+Batch size: 1
+Initialization time (sec): 0.2537101440
+Number of processes: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/medium_1024.txt
+Parallel mode: A
+Batch size: 1
+Initialization time (sec): 0.3293088330
+Number of processes: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_1024.txt
+Parallel mode: A
+Batch size: 1
+Initialization time (sec): 0.3266505990

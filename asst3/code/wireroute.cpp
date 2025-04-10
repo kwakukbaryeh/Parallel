@@ -246,6 +246,18 @@ static int get_cost_vertical(Wire w, std::vector<std::vector<int>>& grid, Point 
     cost += sq * sq;
     return cost;
 }
+
+int randInt(int min, int max) {
+    if (min > max) {
+        int t = min;
+        min = max;
+        max = t;
+    }
+
+    int range = max - min + 1;
+
+    return rand() % range + min;;
+}
  
 //Route Wires sequentially
 void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int t, int it) {
@@ -263,13 +275,14 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
         Wire minWire = w[i];
 
         if (it > 0 && (double) random() / RAND_MAX < SA_prob) {
-            Point dirs = {w[i].end_x - w[i].start_x, w[i].end_y - w[i].start_y};
             if ((double) random() / RAND_MAX < SA_prob) {
                 //Vertical
-                w[i].bend1_y = (int) (dirs.y * (double) random() / RAND_MAX) + w[i].start_y;
+                w[i].bend1_x = w[i].start_x;
+                w[i].bend1_y = randInt(w[i].start_y, w[i].end_y);
             } else {
                 //Horizontal
-                w[i].bend1_x = (int) (dirs.x * (double) random() / RAND_MAX) + w[i].start_x;
+                w[i].bend1_x = randInt(w[i].start_x, w[i].end_x);
+                w[i].bend1_y = w[i].start_y;
             }
             write_wire(w[i], 1, grid);
             continue;
@@ -348,13 +361,14 @@ void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
         WireCost minCost = {INT_MAX, w[i]};
 
         if (it > 0 && (double) random() / RAND_MAX < SA_prob) {
-            Point dirs = {w[i].end_x - w[i].start_x, w[i].end_y - w[i].start_y};
             if ((double) random() / RAND_MAX < SA_prob) {
                 //Vertical
-                w[i].bend1_y = (int) (dirs.y * (double) random() / RAND_MAX) + w[i].start_y;
+                w[i].bend1_x = w[i].start_x;
+                w[i].bend1_y = randInt(w[i].start_y, w[i].end_y);
             } else {
                 //Horizontal
-                w[i].bend1_x = (int) (dirs.x * (double) random() / RAND_MAX) + w[i].start_x;
+                w[i].bend1_x = randInt(w[i].start_x, w[i].end_x);
+                w[i].bend1_y = w[i].start_y;
             }
             write_wire(w[i], 1, grid);
             continue;
@@ -411,7 +425,7 @@ void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
 }
 
 //Route Wires parallel across wires
-void a_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, std::vector<std::vector<omp_lock_t>> &locks, double SA_prob, Point dim, int t, int it) {
+void a_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, std::vector<std::vector<omp_lock_t>> locks, double SA_prob, Point dim, int t, int it) {
     #pragma omp parallel for schedule(dynamic, 2)
     for(size_t i = 0; i < w.size(); i++) {
         //Remove wire from grid if present
@@ -427,13 +441,14 @@ void a_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, std::vec
         Wire minWire = w[i];
 
         if (it > 0 && (double) random() / RAND_MAX < SA_prob) {
-            Point dirs = {w[i].end_x - w[i].start_x, w[i].end_y - w[i].start_y};
             if ((double) random() / RAND_MAX < SA_prob) {
                 //Vertical
-                w[i].bend1_y = (int) (dirs.y * (double) random() / RAND_MAX) + w[i].start_y;
+                w[i].bend1_x = w[i].start_x;
+                w[i].bend1_y = randInt(w[i].start_y, w[i].end_y);
             } else {
                 //Horizontal
-                w[i].bend1_x = (int) (dirs.x * (double) random() / RAND_MAX) + w[i].start_x;
+                w[i].bend1_x = randInt(w[i].start_x, w[i].end_x);
+                w[i].bend1_y = w[i].start_y;
             }
             lock_write_wire(w[i], 1, grid, locks);
             continue;
@@ -648,6 +663,7 @@ int main(int argc, char *argv[]) {
     * Don't use global variables.
     * Use OpenMP to parallelize the algorithm. 
     */
+
     if (parallel_mode == 'W') {
         for (int i = 0; i < SA_iters; i++)
             w_route(wires, occupancy, SA_prob, {dim_x, dim_y}, num_threads, i);

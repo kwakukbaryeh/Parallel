@@ -1,0 +1,23 @@
+# !/bin/bash
+
+for i in {1,2,4,8}
+do
+    mpirun -n $i ./wireroute -f inputs/timeinput/easy_1024.txt -m A -b 128
+    mpirun -n $i ./wireroute -f inputs/timeinput/medium_1024.txt -m A -b 128
+    mpirun -n $i ./wireroute -f inputs/timeinput/hard_1024.txt -m A -b 128
+done
+
+for i in {1,16,128}
+do
+    mpirun -n 8 ./wireroute -f inputs/timeinput/easy_1024.txt -m A -b $i
+    mpirun -n 8 ./wireroute -f inputs/timeinput/medium_1024.txt -m A -b $i
+    mpirun -n 8 ./wireroute -f inputs/timeinput/hard_1024.txt -m A -b $i
+done
+
+for i in {1,2,4,8}
+do
+    perf stat -e cache-misses mpirun -n $i ./wireroute -f inputs/timeinput/easy_1024.txt -m A -b 128
+    perf stat -e cache-misses mpirun -n $i ./wireroute -f inputs/timeinput/medium_1024.txt -m A -b 128
+    perf stat -e cache-misses mpirun -n $i ./wireroute -f inputs/timeinput/hard_1024.txt -m A -b 128
+done
+ 

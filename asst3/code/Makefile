@@ -15,7 +15,3 @@ $(APP_NAME): $(OBJS)
 
 clean:
 	/bin/rm -rf *~ *.o $(APP_NAME) *.class
-	rm inputs/timeinput/*_occupancy_*.txt
-	rm inputs/timeinput/*_wires_*.txt
-	rm inputs/testinput/*_occupancy_*.txt
-	rm inputs/testinput/*_wires_*.txt

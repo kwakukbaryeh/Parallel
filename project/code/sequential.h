@@ -65,4 +65,5 @@ void update_edge_weights(Graph &graph);
 // Generate a simple test graph.
 Graph create_test_graph();
 
+Graph create_large_test_graph(int rows, int cols);
 #endif // SEQUENTIAL_H

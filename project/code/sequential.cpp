@@ -129,3 +129,74 @@ Graph create_test_graph() {
     
     return graph;
 }
+
+
+Graph create_large_test_graph(int rows, int cols) {
+    Graph graph;
+    
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            Node node;
+            node.id = r * cols + c;
+            node.x = (float)c;
+            node.y = (float)r;
+            graph.nodes.push_back(node);
+        }
+    }
+    
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            int current = r * cols + c;
+            if (c < cols - 1) {
+                int right = r * cols + (c + 1);
+                Edge e;
+                e.start = current; e.end = right;
+                e.base_weight = 1.0;
+                e.curr_weight = 1.0;
+                e.capacity = 1;
+                e.load = 0;
+                graph.edges.push_back(e);
+            }
+            if (r < rows - 1) {
+                int down = (r + 1) * cols + c;
+                Edge e;
+                e.start = current; e.end = down;
+                e.base_weight = 1.0;
+                e.curr_weight = 1.0;
+                e.capacity = 1;
+                e.load = 0;
+                graph.edges.push_back(e);
+            }
+            if (r < rows - 1 && c < cols - 1) {
+                int downRight = (r + 1) * cols + (c + 1);
+                Edge e;
+                e.start = current; e.end = downRight;
+                e.base_weight = 1.414; 
+                e.curr_weight = 1.414;
+                e.capacity = 1;
+                e.load = 0;
+                graph.edges.push_back(e);
+            }
+            if (r < rows - 1 && c > 0) {
+                int downLeft = (r + 1) * cols + (c - 1);
+                Edge e;
+                e.start = current; e.end = downLeft;
+                e.base_weight = 1.414;
+                e.curr_weight = 1.414;
+                e.capacity = 1;
+                e.load = 0;
+                graph.edges.push_back(e);
+            }
+        }
+    }
+    
+    graph.adj.resize(graph.nodes.size());
+    for (int i = 0; i < graph.edges.size(); i++) {
+        int u = graph.edges[i].start;
+        int v = graph.edges[i].end;
+        graph.adj[u].push_back(i);
+        graph.adj[v].push_back(i);
+    }
+    
+    return graph;
+}

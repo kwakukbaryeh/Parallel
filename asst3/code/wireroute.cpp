@@ -97,7 +97,7 @@ static inline void write_wire(Wire w, int v, std::vector<std::vector<int>>& grid
 }
 
 //Write the wire to the occupancy matrix
-static void lock_write_wire(Wire w, int v, std::vector<std::vector<int>>& grid, std::vector<std::vector<omp_lock_t>> locks) {
+static void lock_write_wire(Wire w, int v, std::vector<std::vector<int>>& grid, std::vector<std::vector<omp_lock_t>>& locks) { //Fix by passing locks by reference 
     Point start = {w.start_x, w.start_y};
     Point bend1 = {w.bend1_x, w.bend1_y};
     Point bend2;
@@ -128,7 +128,7 @@ static void lock_write_wire(Wire w, int v, std::vector<std::vector<int>>& grid, 
         }
 
         for (int x = bend1.x; x_dir < 0 ? bend2.x < x : x < bend2.x; x += x_dir) {
-            if (x/GRID_SIZE != lock_coords.y) {
+            if (x/GRID_SIZE != lock_coords.x) {
                 omp_unset_lock(&locks[lock_coords.y][lock_coords.x]);
                 lock_coords.x = x/GRID_SIZE;
                 omp_set_lock(&locks[lock_coords.y][lock_coords.x]);
@@ -146,7 +146,7 @@ static void lock_write_wire(Wire w, int v, std::vector<std::vector<int>>& grid, 
         }
     } else { 
         for (int x = start.x; x_dir < 0 ? bend1.x < x : x < bend1.x; x += x_dir) {
-            if (x/GRID_SIZE != lock_coords.y) {
+            if (x/GRID_SIZE != lock_coords.x) {
                 omp_unset_lock(&locks[lock_coords.y][lock_coords.x]);
                 lock_coords.x = x/GRID_SIZE;
                 omp_set_lock(&locks[lock_coords.y][lock_coords.x]);
@@ -164,7 +164,7 @@ static void lock_write_wire(Wire w, int v, std::vector<std::vector<int>>& grid, 
         }
 
         for (int x = bend2.x; x_dir < 0 ? end.x < x : x < end.x; x += x_dir) {
-            if (x/GRID_SIZE != lock_coords.y) {
+            if (x/GRID_SIZE != lock_coords.x) {
                 omp_unset_lock(&locks[lock_coords.y][lock_coords.x]);
                 lock_coords.x = x/GRID_SIZE;
                 omp_set_lock(&locks[lock_coords.y][lock_coords.x]);

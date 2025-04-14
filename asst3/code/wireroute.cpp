@@ -347,30 +347,35 @@ void s_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
 }
 
 //Route Wires per wire parallelism
-void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double SA_prob, Point dim, int t, int it) {
+void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, std::vector<std::vector<omp_lock_t>> locks, double SA_prob, Point dim, int t, int it) {
+    #pragma omp parallel for
     for(size_t i = 0; i < w.size(); i++) {
-        //Remove wire from grid if present
+        Wire old_wire = w[i]; // Save previous iteration's wire
+        if (it > 0) {
+            // Remove the previous path
+            lock_write_wire(old_wire, -1, grid, locks);
+        }
+
+        // Check if current wire is straight
         if (w[i].start_x == w[i].end_x || w[i].start_y == w[i].end_y) {
-            if(it == 0)
-                write_wire(w[i], 1, grid);
+            // Add straight wire to grid
+            lock_write_wire(w[i], 1, grid, locks);
             continue;
-        } else if (it > 0) {
-            write_wire(w[i], -1, grid);
         }
 
         WireCost minCost = {INT_MAX, w[i]};
 
         if (it > 0 && (double) random() / RAND_MAX < SA_prob) {
             if ((double) random() / RAND_MAX < SA_prob) {
-                //Vertical
+                // Vertical
                 w[i].bend1_x = w[i].start_x;
                 w[i].bend1_y = randInt(w[i].start_y, w[i].end_y);
             } else {
-                //Horizontal
+                // Horizontal
                 w[i].bend1_x = randInt(w[i].start_x, w[i].end_x);
                 w[i].bend1_y = w[i].start_y;
             }
-            write_wire(w[i], 1, grid);
+            lock_write_wire(w[i], 1, grid, locks);
             continue;
         } else {
             #pragma omp declare reduction(min_cost : WireCost : omp_out = (omp_out.c < omp_in.c) ? omp_out : omp_in) initializer(omp_priv={INT_MAX, {0,0,0,0,0,0}})
@@ -420,7 +425,7 @@ void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
 
         //Add new wire to grid and wires
         w[i] = minCost.w;
-        write_wire(w[i], 1, grid);
+        lock_write_wire(w[i], 1, grid, locks);
     }
 }
 
@@ -428,13 +433,17 @@ void w_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, double S
 void a_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, std::vector<std::vector<omp_lock_t>> locks, double SA_prob, Point dim, int t, int it) {
     #pragma omp parallel for schedule(dynamic, 2)
     for(size_t i = 0; i < w.size(); i++) {
-        //Remove wire from grid if present
+        Wire old_wire = w[i]; // Save previous iteration's wire
+        if (it > 0) {
+            // Remove the previous path
+            lock_write_wire(old_wire, -1, grid, locks);
+        }
+
+        // Check if current wire is straight
         if (w[i].start_x == w[i].end_x || w[i].start_y == w[i].end_y) {
-            if(it == 0)
-                lock_write_wire(w[i], 1, grid, locks);
+            // Add straight wire to grid
+            lock_write_wire(w[i], 1, grid, locks);
             continue;
-        } else if (it > 0) {
-            lock_write_wire(w[i], -1, grid, locks);
         }
 
         int minCost = INT_MAX;
@@ -442,11 +451,11 @@ void a_route(std::vector<Wire> &w, std::vector<std::vector<int>> &grid, std::vec
 
         if (it > 0 && (double) random() / RAND_MAX < SA_prob) {
             if ((double) random() / RAND_MAX < SA_prob) {
-                //Vertical
+                // Vertical
                 w[i].bend1_x = w[i].start_x;
                 w[i].bend1_y = randInt(w[i].start_y, w[i].end_y);
             } else {
-                //Horizontal
+                // Horizontal
                 w[i].bend1_x = randInt(w[i].start_x, w[i].end_x);
                 w[i].bend1_y = w[i].start_y;
             }
@@ -646,9 +655,11 @@ int main(int argc, char *argv[]) {
                       std::vector<omp_lock_t> ((dim_x + GRID_SIZE - 1) / GRID_SIZE));
 
     /* Initialize any additional data structures needed in the algorithm */
-    for (std::vector<omp_lock_t> row : locks)
-        for (size_t i = 0; i < row.size(); i++)
-            omp_init_lock(&row[i]);
+    for (auto &row : locks) {      // Use reference to avoid copying
+        for (auto &lock : row) {   // Iterate by reference
+            omp_init_lock(&lock);
+        }
+    }
 
     omp_set_num_threads(num_threads);
 
@@ -666,10 +677,16 @@ int main(int argc, char *argv[]) {
 
     if (parallel_mode == 'W') {
         for (int i = 0; i < SA_iters; i++)
-            w_route(wires, occupancy, SA_prob, {dim_x, dim_y}, num_threads, i);
+            w_route(wires, occupancy, locks, SA_prob, {dim_x, dim_y}, num_threads, i);
     } else /*parallel_mode == 'A'*/ {
         for (int i = 0; i < SA_iters; i++)
             a_route(wires, occupancy, locks, SA_prob, {dim_x, dim_y}, num_threads, i);
+    }
+
+    for (auto &row : locks) {
+        for (auto &lock : row) {
+            omp_destroy_lock(&lock);
+        }
     }
 
     const double compute_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - compute_start).count();
